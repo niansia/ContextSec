@@ -170,6 +170,18 @@ Release gate:
 - release evidence and every published asset verify locally and after draft re-download before publication;
 - independent ecosystem accuracy remains unclaimed until qualified third parties contribute attested labels and predictions under the frozen protocol.
 
+## v0.4.1 - Promotion-readiness boundary fixes
+
+Delivered scope:
+
+- pre- and post-scan Git provenance equality for repository and aggregate component profiling;
+- privacy-transformed embedded component models whose canonical roots remain bound only through full path identities;
+- detector/checker semantic identities that include final repository orchestration;
+- indentation-aware job container/service image auditing without treating action `with.image` inputs as containers;
+- regression coverage for all four review cases and a first-run README path before the deep evidence reference.
+
+Artifact schemas remain at 0.4.0 because these changes strengthen collection, display privacy, model identity, and CI audit parsing without changing artifact field shapes.
+
 ## Next evidence milestone
 
 - collect externally labeled repositories from the frozen sampling protocol without maintainer participation;

@@ -43,7 +43,7 @@ generate / review / test
 Control Ledger + evidence + release gate
 ```
 
-**Status:** research preview `v0.4.0`. Local-first, read-only profiling, no source upload, no target-code execution, and no third-party runtime dependency.
+**Status:** research preview `v0.4.1`. Local-first, read-only profiling, no source upload, no target-code execution, and no third-party runtime dependency.
 
 **Versioning:** Tool, detector, checker, and artifact-schema versions are independent and each has one canonical file. Their semantic model digests bind the behavior and dependencies that affect each artifact while ignoring comments and formatting.
 
@@ -62,9 +62,12 @@ The profiler preserves four distinctions generic security prompts usually blur:
 
 ## 90-second demo
 
-The included fixture is an intentionally incomplete Next.js invoice SaaS with Stripe, PII, tenancy, S3 uploads, and OpenAI:
+The included fixture is an intentionally incomplete Next.js invoice SaaS with Stripe, PII, tenancy, S3 uploads, and OpenAI. Clone the repository first; the commands below use `python` on Windows—use `python3` on macOS or Linux:
 
 ```bash
+git clone https://github.com/niansia/ContextSec.git
+cd ContextSec
+
 python .agents/skills/contextsec/scripts/contextsec.py profile \
   --repo examples/composite-saas \
   --format markdown
@@ -106,101 +109,6 @@ python .agents/skills/contextsec/scripts/contextsec.py explain payments
 python .agents/skills/contextsec/scripts/contextsec.py explain COMP-AI-TEN-001
 python .agents/skills/contextsec/scripts/contextsec.py explain payments --repo examples/composite-saas
 ```
-
-## What is machine-verifiable now
-
-### Security Profile
-
-The profiler emits versioned observations, claims, routing, contradictions, and coverage. Evidence includes:
-
-- `evidence_id`: stable identity for detector + location;
-- `location_id`: stable identity for repository-relative location;
-- `path_identity`: full canonical identity derived from the raw repository-relative path, independent of its display policy;
-- `content_digest`: whole-file integrity digest;
-- `fingerprint`: evidence identity bound to the content digest;
-- `subject_revision`: the bounded repository scope plus active routing model evaluated by this run;
-- `source_inventory_digest`: the exact supported production file inventory shared by profiler and checker, used to reject mid-evaluation source changes.
-- `source_provenance`: a canonical Git origin, full commit, and clean/dirty worktree state; only all-three verified can bind a Profile to a frozen external case.
-
-These hashes are integrity identifiers, not secrecy mechanisms. ContextSec never emits matched source lines or source-content values. Repository-relative filenames use bounded heuristic redaction by default and may themselves contain personal data; use `--path-privacy hashed` or `--path-privacy opaque` when filenames are sensitive. Those modes are deterministic pseudonymization, not secrecy: low-entropy filenames can still be guessed by hashing candidate paths. The selected policy is explicit in `artifact_options.path_privacy` and never changes canonical path identity.
-
-### Pack and control catalog
-
-[The machine-readable catalog](.agents/skills/contextsec/references/catalog.json) is the single source for pack order, claims, dependencies, per-control `applies_when` conditions, 16 risk packs, and 116 controls. Its [JSON Schema](.agents/skills/contextsec/references/catalog.schema.json) and semantic validator reject malformed fields—including string values masquerading as booleans. Human-readable pack files add implementation and verification guidance.
-
-The [machine-readable support matrix](.agents/skills/contextsec/references/support-matrix.json) and its [JSON Schema](.agents/skills/contextsec/references/support-matrix.schema.json) define profiler/checker manifests, suffixes, framework families, coverage semantics, and the ten published deterministic checker families. `contextsec doctor` reports that complete contract plus the separate routing, detector, checker, catalog, composition, and support-matrix digests.
-
-### Composition engine
-
-[Nine composition rules](.agents/skills/contextsec/references/compositions/catalog.json) become candidates when contexts coexist and become required only when an intersection capability or deterministic flow finding is present, including:
-
-- payment + multi-tenant;
-- AI + PII and AI + multi-tenant;
-- upload + multi-tenant and API + multi-tenant;
-- support/admin + multi-tenant;
-- SaaS OAuth + PII;
-- CI/CD + cloud IAM;
-- AI + high-impact transactions.
-
-### Monorepo component model
-
-A monorepo is not treated as one blended application. `profile-components` consumes an explicit component model, rejects duplicate or overlapping roots, unknown dependencies, dependency cycles, and flows with unknown endpoints, then emits one independently source-bound Profile per component plus declared cross-component flows. The aggregate artifact binds the component manifest digest and each component Profile digest.
-
-```bash
-python .agents/skills/contextsec/scripts/contextsec.py profile-components \
-  --repo . \
-  --components component-model.json \
-  --output component-profile.json
-
-python .agents/skills/contextsec/scripts/contextsec.py validate-component-profile \
-  component-profile.json
-```
-
-Cross-component flow declarations require named capabilities and evidence references; they do not silently convert component co-location into a proven data flow.
-
-### Control Evaluation Ledger and release gate
-
-Every active control receives:
-
-```text
-evaluation_date · control_id · applicability · verification · severity · blocking
-evidence_refs · required_verification · reason · waiver
-```
-
-`applicability` is one of `required`, `candidate`, `not_applicable`, or `unknown`.
-`verification` is independently one of `verified`, `failed`, `unknown`, or
-`waived`. This prevents “not relevant here” from being confused with “security
-tested and passed.”
-
-The gate semantics are strict:
-
-- `PASS`: all blocking required controls are verified;
-- `WARN`: only non-blocking or candidate gaps remain;
-- `BLOCK`: a blocking control failed, is unknown, traversal is partial, or profiler stack support is partial/unsupported;
-- `WAIVED`: every blocker has a named owner, reason, compensating control, and unexpired waiver evaluated against an explicit date. Consumers must run `contextsec.py validate-ledger <ledger> --as-of <release-date>` so an old waiver artifact cannot be replayed.
-
-## Product-risk packs
-
-| Plane | Pack | Representative decisions |
-|---|---|---|
-| Universal | `foundation` | trust boundaries, server authority, secrets, dependency trust, fail-safe evidence |
-| Application | `baseline-web` | browser output, CSRF, cookies, caching, admin surface |
-| Identity | `auth-session` | sessions, OAuth/OIDC, recovery, tokens, step-up |
-| Money | `payments` | trusted price/state, webhook authenticity, replay, payout authority |
-| Data | `privacy-pii` | inventory, minimization, access, processors, lifecycle, data fan-out |
-| Isolation | `multi-tenant` | DB, cache, object, async, search, and support tenant boundaries |
-| Inbound | `api-inbound` | object/function/property authority, schemas, budgets, token intent |
-| Outbound | `external-api` | destination trust, egress, provider failure, response trust, TLS |
-| Content | `file-upload` | type, name, size, storage, parser isolation, download, scanner failure |
-| AI | `ai-rag-agent` | indirect injection, RAG ACL, tools, memory, output trust, autonomy |
-| Secrets plane | `secrets-management` | value read, bulk export, scope, rotation, cascade, detection, audit |
-| Cloud authority | `cloud-iam-controlplane` | human admin, workload identity, lateral trust, audit, management network |
-| Delivery | `cicd-supply-chain` | immutable actions, token permissions, fork isolation, OIDC, provenance |
-| Connected SaaS | `third-party-saas-oauth` | grant inventory, scope, token lifecycle, vendor blast radius, export |
-| Operations | `support-admin-ops` | JIT access, case reason, masking, bulk limits, impersonation, audit |
-| Irreversible action | `high-impact-transactions` | intent binding, fresh state, recipient, step-up, limits, dual control, replay |
-
-This is the strategic boundary: OWASP and specialist tools explain security rules and find classes of flaws. ContextSec decides which product-risk invariants must be active, composes them, and tracks whether the required evidence exists.
 
 ## Install as an agent skill
 
@@ -282,6 +190,101 @@ cp -R .agents/skills/contextsec/. ~/.agents/skills/contextsec/
 
 For repository-local use in another project, copy the canonical folder to that repository's `.agents/skills/contextsec`; Claude Code users can use `.claude/skills/contextsec` instead. Keep one canonical copy rather than maintaining platform-specific prompt forks.
 
+## What is machine-verifiable now
+
+### Security Profile
+
+The profiler emits versioned observations, claims, routing, contradictions, and coverage. Evidence includes:
+
+- `evidence_id`: stable identity for detector + location;
+- `location_id`: stable identity for repository-relative location;
+- `path_identity`: full canonical identity derived from the raw repository-relative path, independent of its display policy;
+- `content_digest`: whole-file integrity digest;
+- `fingerprint`: evidence identity bound to the content digest;
+- `subject_revision`: the bounded repository scope plus active routing model evaluated by this run;
+- `source_inventory_digest`: the exact supported production file inventory shared by profiler and checker, used to reject mid-evaluation source changes.
+- `source_provenance`: a canonical Git origin, full commit, and clean/dirty worktree state; identical pre- and post-scan snapshots are required before all-three verified can bind a Profile to a frozen external case.
+
+These hashes are integrity identifiers, not secrecy mechanisms. ContextSec never emits matched source lines or source-content values. Repository-relative filenames use bounded heuristic redaction by default and may themselves contain personal data; use `--path-privacy hashed` or `--path-privacy opaque` when filenames are sensitive. Those modes are deterministic pseudonymization, not secrecy: low-entropy filenames can still be guessed by hashing candidate paths. The selected policy is explicit in `artifact_options.path_privacy` and never changes canonical path identity.
+
+### Pack and control catalog
+
+[The machine-readable catalog](.agents/skills/contextsec/references/catalog.json) is the single source for pack order, claims, dependencies, per-control `applies_when` conditions, 16 risk packs, and 116 controls. Its [JSON Schema](.agents/skills/contextsec/references/catalog.schema.json) and semantic validator reject malformed fields—including string values masquerading as booleans. Human-readable pack files add implementation and verification guidance.
+
+The [machine-readable support matrix](.agents/skills/contextsec/references/support-matrix.json) and its [JSON Schema](.agents/skills/contextsec/references/support-matrix.schema.json) define profiler/checker manifests, suffixes, framework families, coverage semantics, and the ten published deterministic checker families. `contextsec doctor` reports that complete contract plus the separate routing, detector, checker, catalog, composition, and support-matrix digests.
+
+### Composition engine
+
+[Nine composition rules](.agents/skills/contextsec/references/compositions/catalog.json) become candidates when contexts coexist and become required only when an intersection capability or deterministic flow finding is present, including:
+
+- payment + multi-tenant;
+- AI + PII and AI + multi-tenant;
+- upload + multi-tenant and API + multi-tenant;
+- support/admin + multi-tenant;
+- SaaS OAuth + PII;
+- CI/CD + cloud IAM;
+- AI + high-impact transactions.
+
+### Monorepo component model
+
+A monorepo is not treated as one blended application. `profile-components` consumes an explicit component model, rejects duplicate or overlapping roots, unknown dependencies, dependency cycles, and flows with unknown endpoints, then emits one independently source-bound Profile per component plus declared cross-component flows. The aggregate artifact binds canonical component roots through full path identities and each component Profile digest, while every displayed root obeys `artifact_options.path_privacy`.
+
+```bash
+python .agents/skills/contextsec/scripts/contextsec.py profile-components \
+  --repo . \
+  --components component-model.json \
+  --output component-profile.json
+
+python .agents/skills/contextsec/scripts/contextsec.py validate-component-profile \
+  component-profile.json
+```
+
+Cross-component flow declarations require named capabilities and evidence references; they do not silently convert component co-location into a proven data flow.
+
+### Control Evaluation Ledger and release gate
+
+Every active control receives:
+
+```text
+evaluation_date · control_id · applicability · verification · severity · blocking
+evidence_refs · required_verification · reason · waiver
+```
+
+`applicability` is one of `required`, `candidate`, `not_applicable`, or `unknown`.
+`verification` is independently one of `verified`, `failed`, `unknown`, or
+`waived`. This prevents “not relevant here” from being confused with “security
+tested and passed.”
+
+The gate semantics are strict:
+
+- `PASS`: all blocking required controls are verified;
+- `WARN`: only non-blocking or candidate gaps remain;
+- `BLOCK`: a blocking control failed, is unknown, traversal is partial, or profiler stack support is partial/unsupported;
+- `WAIVED`: every blocker has a named owner, reason, compensating control, and unexpired waiver evaluated against an explicit date. Consumers must run `contextsec.py validate-ledger <ledger> --as-of <release-date>` so an old waiver artifact cannot be replayed.
+
+## Product-risk packs
+
+| Plane | Pack | Representative decisions |
+|---|---|---|
+| Universal | `foundation` | trust boundaries, server authority, secrets, dependency trust, fail-safe evidence |
+| Application | `baseline-web` | browser output, CSRF, cookies, caching, admin surface |
+| Identity | `auth-session` | sessions, OAuth/OIDC, recovery, tokens, step-up |
+| Money | `payments` | trusted price/state, webhook authenticity, replay, payout authority |
+| Data | `privacy-pii` | inventory, minimization, access, processors, lifecycle, data fan-out |
+| Isolation | `multi-tenant` | DB, cache, object, async, search, and support tenant boundaries |
+| Inbound | `api-inbound` | object/function/property authority, schemas, budgets, token intent |
+| Outbound | `external-api` | destination trust, egress, provider failure, response trust, TLS |
+| Content | `file-upload` | type, name, size, storage, parser isolation, download, scanner failure |
+| AI | `ai-rag-agent` | indirect injection, RAG ACL, tools, memory, output trust, autonomy |
+| Secrets plane | `secrets-management` | value read, bulk export, scope, rotation, cascade, detection, audit |
+| Cloud authority | `cloud-iam-controlplane` | human admin, workload identity, lateral trust, audit, management network |
+| Delivery | `cicd-supply-chain` | immutable actions, token permissions, fork isolation, OIDC, provenance |
+| Connected SaaS | `third-party-saas-oauth` | grant inventory, scope, token lifecycle, vendor blast radius, export |
+| Operations | `support-admin-ops` | JIT access, case reason, masking, bulk limits, impersonation, audit |
+| Irreversible action | `high-impact-transactions` | intent binding, fresh state, recipient, step-up, limits, dual control, replay |
+
+This is the strategic boundary: OWASP and specialist tools explain security rules and find classes of flaws. ContextSec decides which product-risk invariants must be active, composes them, and tracks whether the required evidence exists.
+
 ## Benchmark and incident corpus
 
 Run every offline benchmark suite:
@@ -344,7 +347,7 @@ python .agents/skills/contextsec/scripts/contextsec.py explain secrets-managemen
 
 - Detectors are strongest for Node.js, Python dependency manifests, Next.js, FastAPI, Django, Prisma, Terraform, and common CI workflow shapes. Other stacks may need manual evidence or future adapters.
 - The lexical adapters are deterministic but are not full language parsers. Every detector needs positive/negative twins, and ambiguous evidence remains candidate or unknown.
-- Race-resistant descriptor reads reject observed replacement and in-place mutation, but ContextSec does not create an operating-system-wide atomic filesystem snapshot.
+- Race-resistant descriptor reads reject observed replacement and in-place mutation, and Git provenance must match before and after traversal, but ContextSec does not create an operating-system-wide atomic filesystem snapshot.
 - The built-in control checks remain narrow. The exact 125-row verification-coverage artifact distinguishes automated methods from evidence-required controls; neither classification proves a repository passed.
 - A verified source provenance binds a clean checkout to its Git commit and canonical origin, but it is not by itself a signature and cannot prove skipped input safe.
 - Release evidence supplied by an owner still needs trustworthy test/configuration provenance. The ledger records the assertion; it cannot magically establish its truth.

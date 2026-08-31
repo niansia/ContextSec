@@ -26,37 +26,41 @@ import versioning  # noqa: E402
 CHECKER_VERSION = versioning.CHECKER_VERSION
 
 
+CHECKER_MODEL_SYMBOLS = (
+    "CHECKER_SUPPORTED_SUFFIXES",
+    "CHECKER_UNSUPPORTED_SUFFIXES",
+    "CHECKER_PIPELINE",
+    "checker_stack_family",
+    "digest",
+    "location",
+    "finding",
+    "load_sources",
+    "prisma_models_with_fields",
+    "check_tenant_queries",
+    "check_tenant_raw_queries",
+    "check_pii_logging",
+    "check_ai_egress",
+    "_skip_js_trivia",
+    "_js_static_string",
+    "_js_object_properties",
+    "_js_static_expression",
+    "_tenant_identity_use",
+    "check_client_public_secrets",
+    "check_public_upload",
+    "check_upload_tenant_binding",
+    "check_payment_idempotency",
+    "check_cicd_action_pins",
+    "check_cicd_declared_permissions",
+    "check_repository",
+)
+
+
 def checker_model_digest() -> str:
     """Digest normalized checker behavior, orchestration, and live dependencies."""
 
     return model_digest.semantic_model_digest(
         path=Path(__file__),
-        symbols=(
-            "CHECKER_SUPPORTED_SUFFIXES",
-            "CHECKER_UNSUPPORTED_SUFFIXES",
-            "CHECKER_PIPELINE",
-            "checker_stack_family",
-            "digest",
-            "location",
-            "finding",
-            "load_sources",
-            "prisma_models_with_fields",
-            "check_tenant_queries",
-            "check_tenant_raw_queries",
-            "check_pii_logging",
-            "check_ai_egress",
-            "_skip_js_trivia",
-            "_js_static_string",
-            "_js_object_properties",
-            "_js_static_expression",
-            "_tenant_identity_use",
-            "check_client_public_secrets",
-            "check_public_upload",
-            "check_upload_tenant_binding",
-            "check_payment_idempotency",
-            "check_cicd_action_pins",
-            "check_cicd_declared_permissions",
-        ),
+        symbols=CHECKER_MODEL_SYMBOLS,
         dependencies={
             "detector_model_digest": profile_repo.DETECTOR_MODEL_DIGEST,
             "safe_io": model_digest.semantic_module_digest(Path(safe_io.__file__)),

@@ -117,64 +117,67 @@ def canonical_digest(value: Any) -> str:
     ).hexdigest()
 
 
-def detector_model_digest() -> str:
-    """Digest only normalized detector/evidence behavior and its live dependencies."""
+DETECTOR_MODEL_SYMBOLS = (
+    "DEFAULT_MAX_FILES",
+    "DEFAULT_MAX_FILE_BYTES",
+    "DEFAULT_MAX_TOTAL_BYTES",
+    "MAX_CONTEXT_BYTES",
+    "EXCLUDED_DIRS",
+    "DOCUMENTATION_DIRS",
+    "TEST_DIRS",
+    "DOCUMENTATION_SUFFIXES",
+    "SOURCE_SUFFIXES",
+    "PROFILE_SUPPORTED_MANIFESTS",
+    "PROFILE_UNSUPPORTED_MANIFESTS",
+    "PROFILE_SUPPORTED_SUFFIXES",
+    "PROFILE_UNSUPPORTED_SUFFIXES",
+    "TENANT_KEY_PATTERN",
+    "TENANT_PREDICATE_PATTERN",
+    "MANIFEST_NAMES",
+    "TEXT_DETECTORS",
+    "KNOWN_CAPABILITIES",
+    "DETECTOR_CAPABILITIES",
+    "CAPABILITY_CONTEXT_PACKS",
+    "TextDetector",
+    "WalkStats",
+    "sha256_text",
+    "path_identity",
+    "evidence_semantics",
+    "detector_contracts",
+    "reject_duplicate_keys",
+    "strict_json_loads",
+    "classify_scope",
+    "is_supported_file",
+    "is_environment_file",
+    "sanitize_environment_text",
+    "profile_stack_family",
+    "has_reparse_attribute",
+    "is_link_like",
+    "line_number",
+    "make_observation",
+    "inspect_package_json",
+    "_strip_manifest_comment",
+    "_dependency_name",
+    "python_dependency_specs",
+    "python_manifest_indirections",
+    "inspect_python_manifest",
+    "inspect_text",
+    "language_for_path",
+    "sql_dash_starts_comment",
+    "sql_hash_starts_comment",
+    "mask_comments_and_strings",
+    "iter_repository_files",
+    "build_capabilities",
+    "profile_repository",
+)
 
-    symbols = (
-        "DEFAULT_MAX_FILES",
-        "DEFAULT_MAX_FILE_BYTES",
-        "DEFAULT_MAX_TOTAL_BYTES",
-        "MAX_CONTEXT_BYTES",
-        "EXCLUDED_DIRS",
-        "DOCUMENTATION_DIRS",
-        "TEST_DIRS",
-        "DOCUMENTATION_SUFFIXES",
-        "SOURCE_SUFFIXES",
-        "PROFILE_SUPPORTED_MANIFESTS",
-        "PROFILE_UNSUPPORTED_MANIFESTS",
-        "PROFILE_SUPPORTED_SUFFIXES",
-        "PROFILE_UNSUPPORTED_SUFFIXES",
-        "TENANT_KEY_PATTERN",
-        "TENANT_PREDICATE_PATTERN",
-        "MANIFEST_NAMES",
-        "TEXT_DETECTORS",
-        "KNOWN_CAPABILITIES",
-        "DETECTOR_CAPABILITIES",
-        "CAPABILITY_CONTEXT_PACKS",
-        "TextDetector",
-        "WalkStats",
-        "sha256_text",
-        "path_identity",
-        "evidence_semantics",
-        "detector_contracts",
-        "reject_duplicate_keys",
-        "strict_json_loads",
-        "classify_scope",
-        "is_supported_file",
-        "is_environment_file",
-        "sanitize_environment_text",
-        "profile_stack_family",
-        "has_reparse_attribute",
-        "is_link_like",
-        "line_number",
-        "make_observation",
-        "inspect_package_json",
-        "_strip_manifest_comment",
-        "_dependency_name",
-        "python_dependency_specs",
-        "python_manifest_indirections",
-        "inspect_python_manifest",
-        "inspect_text",
-        "language_for_path",
-        "sql_dash_starts_comment",
-        "sql_hash_starts_comment",
-        "mask_comments_and_strings",
-        "iter_repository_files",
-        "build_capabilities",
-    )
+
+def detector_model_digest() -> str:
+    """Digest normalized detector behavior, orchestration, and dependencies."""
+
     return model_digest.semantic_model_digest(
         path=Path(__file__),
-        symbols=symbols,
+        symbols=DETECTOR_MODEL_SYMBOLS,
         dependencies={
             "safe_io": model_digest.semantic_module_digest(Path(safe_io.__file__)),
             "source_provenance": model_digest.semantic_module_digest(
@@ -2633,6 +2636,11 @@ def profile_repository(
     capabilities = build_capabilities(observations, coverage_status, routing)
     required_packs = [item["pack"] for item in routing if item["state"] == "required"]
     candidate_packs = [item["pack"] for item in routing if item["state"] == "candidate"]
+    source_after = source_provenance.read(source_root)
+    if source_after != source:
+        raise ValueError(
+            "Repository Git provenance changed during profiling; no Profile was emitted."
+        )
     scope_material = [
         "schema=" + SCHEMA_VERSION,
         "detector=" + DETECTOR_VERSION,

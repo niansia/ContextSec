@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.1 — Promotion-readiness trust-boundary fixes
+
+- Fail closed when canonical Git origin, commit, or clean/dirty state changes between pre- and post-scan provenance snapshots, including aggregate component profiling.
+- Keep canonical component roots out of `hashed` and `opaque` component artifacts while binding each raw root through its full path identity in the semantic component-model digest.
+- Include `profile_repository` and `check_repository` orchestration ASTs in detector/checker model identities, with regressions proving behavior-changing orchestration edits change the digest.
+- Parse only job `container` and `services` image fields in the CI audit so action inputs such as `with.image` cannot create deterministic container false positives.
+- Move first-run instructions ahead of the deep evidence reference and reconcile the delivered v0.4 monorepo work with the public issue tracker.
+
 ## 0.4.0 — Trust closure and component evidence
 
 - Split tool, detector, checker, and artifact-schema versions into independent canonical sources and replaced source-text digests with dependency-aware semantic model digests that ignore formatting and comments.

@@ -41,9 +41,9 @@ Tool, detector, checker, and artifact-schema versions advance independently. Dep
 
 ## Source and component identity
 
-A single-repository Profile records a canonical Git origin, full commit, and worktree state. `verified` means all three are available and the worktree is clean; `dirty` and `unavailable` remain explicit. This is local source provenance, not a cryptographic signature.
+A single-repository Profile records a canonical Git origin, full commit, and worktree state. `verified` means all three are available, the worktree is clean, and identical pre- and post-scan provenance snapshots bound the traversal; a mismatch fails closed without emitting a Profile. `dirty` and `unavailable` remain explicit. This is local source provenance, not an atomic filesystem snapshot or cryptographic signature.
 
-For monorepos, an explicit component model declares non-overlapping repository-relative roots, component kinds, acyclic dependencies, and evidence-referenced cross-component flows. ContextSec profiles each component root independently while binding every child Profile to the repository's common Git identity. The aggregate component artifact binds the model digest and child Profile digests. Co-location never proves a cross-component flow.
+For monorepos, an explicit component model declares non-overlapping repository-relative roots, component kinds, acyclic dependencies, and evidence-referenced cross-component flows. ContextSec profiles each component root independently while binding every child Profile to the repository's common Git identity and one aggregate pre/post provenance pair. The aggregate component artifact binds canonical roots through full path identities and child Profile digests; its displayed roots obey the selected path-privacy mode. Co-location never proves a cross-component flow.
 
 ## Trust classes
 
@@ -90,7 +90,7 @@ When every pack in a composition is active, the derived control is emitted as a 
 
 Each active-pack control and active composition becomes exactly one ledger row. `applicability` (`required`, `candidate`, `not_applicable`, `unknown`) and `verification` (`verified`, `failed`, `unknown`, `waived`) are independent dimensions. Catalog `applies_when` rules use detected sub-capabilities to avoid irrelevant blockers. Findings force applicability to `required`; a `failed` deterministic finding cannot be overridden by a supplied `verified` assertion. `verified` and `failed` require evidence references. Waivers require owner, reason, compensating control, expiry, and an explicit deterministic `as-of` date. The ledger records that date, while validation of any waiver-bearing artifact requires the intended release date as an external input to prevent replay.
 
-The profiler runs once per repository evaluation. Its `subject_revision`, repository label, source provenance, optional component identity, artifact options, traversal coverage, stack support, and active packs must match the checker artifact before the ledger accepts it. Routing, detector, checker, catalog, composition, and support-matrix digests are bound separately. Profile and finding IDs, location IDs, evidence IDs, and fingerprints are recomputed for internal consistency.
+The profiler runs once per repository evaluation. Its `subject_revision`, repository label, source provenance, optional component identity, artifact options, traversal coverage, stack support, and active packs must match the checker artifact before the ledger accepts it. Routing, detector, checker, catalog, composition, and support-matrix digests are bound separately; detector and checker identities include their final repository orchestration functions, not only leaf detectors. Profile and finding IDs, location IDs, evidence IDs, and fingerprints are recomputed for internal consistency.
 
 ## Verification coverage and signed evaluation
 

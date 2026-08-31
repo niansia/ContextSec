@@ -33,8 +33,8 @@ IMMUTABLE_CONTAINER = re.compile(
     r"^(?P<image>[A-Za-z0-9._:/-]+)@sha256:[a-f0-9]{64}$",
     re.IGNORECASE,
 )
-CONTAINER_IMAGE = re.compile(
-    r"(?m)^\s+image\s*:\s*[\"']?(?P<value>[^\s\"'#]+)"
+YAML_KEY = re.compile(
+    r"^(?P<indent> *)(?:-\s+)?(?P<key>[A-Za-z0-9_-]+):(?P<tail>.*)$"
 )
 UNTRUSTED_EXPRESSION = re.compile(
     r"\$\{\{\s*"
@@ -99,6 +99,58 @@ def _uses_environment(block: str, name: str) -> bool:
         or re.search(r"\$env:" + escaped + r"\b", block, re.IGNORECASE)
         or re.search(r"%" + escaped + r"%", block, re.IGNORECASE)
     )
+
+
+def _static_yaml_scalar(tail: str) -> Optional[str]:
+    match = re.fullmatch(
+        r"\s*[\"']?(?P<value>[^\s\"'#{}\[\],]+)[\"']?\s*(?:#.*)?", tail
+    )
+    return match.group("value") if match is not None else None
+
+
+def _container_images(text: str) -> list[str]:
+    """Extract only job container/service images from a constrained YAML shape."""
+
+    ancestors: list[tuple[int, str]] = []
+    images: list[str] = []
+    for line in text.splitlines():
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        match = YAML_KEY.match(line)
+        if match is None:
+            continue
+        indent = len(match.group("indent"))
+        while ancestors and ancestors[-1][0] >= indent:
+            ancestors.pop()
+        key = match.group("key")
+        tail = match.group("tail")
+        parent_keys = [item[1] for item in ancestors]
+        is_job_container = (
+            len(parent_keys) >= 2 and parent_keys[-2] == "jobs"
+        )
+        is_container_image = (
+            len(parent_keys) >= 3
+            and parent_keys[-3] == "jobs"
+            and parent_keys[-1] == "container"
+        )
+        is_service_image = (
+            len(parent_keys) >= 4
+            and parent_keys[-4] == "jobs"
+            and parent_keys[-2] == "services"
+        )
+        if key == "container" and tail.strip() and is_job_container:
+            value = _static_yaml_scalar(tail)
+            if value is None:
+                raise ValueError("Job container image must be one static scalar.")
+            images.append(value)
+        elif key == "image" and (is_container_image or is_service_image):
+            value = _static_yaml_scalar(tail)
+            if value is None:
+                raise ValueError("Container/service image must be one static scalar.")
+            images.append(value)
+        if not tail.strip():
+            ancestors.append((indent, key))
+    return images
 
 
 def _permission_mapping(lines: Sequence[str], index: int, indent: int) -> Dict[str, str]:
@@ -293,15 +345,12 @@ def audit_repository(root: Path) -> Dict[str, Any]:
                 step_tail = text[match.end() : match.end() + 300]
                 if not re.search(r"(?m)^\s+persist-credentials:\s*false\s*$", step_tail):
                     issues.append(label + ": checkout does not disable persisted credentials")
-        docker_action_values = {
-            match.group("value")
-            for match in ACTION.finditer(text)
-            if match.group("value").startswith("docker://")
-        }
-        for match in CONTAINER_IMAGE.finditer(text):
-            value = match.group("value")
-            if value in docker_action_values:
-                continue
+        try:
+            container_images = _container_images(text)
+        except ValueError as exc:
+            issues.append(label + ": " + str(exc))
+            container_images = []
+        for value in container_images:
             image_count += 1
             immutable_image = IMMUTABLE_CONTAINER.fullmatch(value)
             if immutable_image is None:
