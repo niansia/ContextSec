@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/niansia/ContextSec/v0.3.1/.agents/skills/contextsec/references/support-matrix.json",
+  "schema_version": "0.3.1",
+  "profile": {
+    "supported_manifests": ["package.json", "pyproject.toml", "requirements.txt", "requirements.in", "Pipfile"],
+    "unsupported_manifests": ["Gemfile", "go.mod", "Cargo.toml", "pom.xml", "build.gradle", "build.gradle.kts", "composer.json"],
+    "supported_suffixes": [".cjs", ".js", ".jsx", ".mjs", ".prisma", ".py", ".sql", ".tf", ".ts", ".tsx", ".vue"],
+    "unsupported_suffixes": [".c", ".cc", ".cpp", ".cs", ".dart", ".go", ".java", ".kt", ".kts", ".php", ".rb", ".rs", ".scala", ".swift"],
+    "frameworks": ["Node.js manifests", "Next.js", "FastAPI", "Django", "Flask", "Prisma", "Terraform", "GitHub Actions"]
+  },
+  "checker": {
+    "supported_suffixes": [".cjs", ".js", ".jsx", ".mjs", ".prisma", ".ts", ".tsx", ".vue"],
+    "unsupported_suffixes": [".c", ".cc", ".cpp", ".cs", ".dart", ".go", ".java", ".kt", ".kts", ".php", ".py", ".rb", ".rs", ".scala", ".swift"],
+    "frameworks": ["Node.js", "Next.js", "Prisma", "S3 SDK shapes", "Stripe SDK shapes", "OpenAI SDK shapes", "GitHub Actions"],
+    "control_shapes": [
+      "tenant-scoped Prisma CRUD",
+      "tenant raw-query abstention",
+      "sensitive object logging",
+      "whole-object AI egress",
+      "client-public secret names",
+      "public S3 upload ACLs",
+      "tenant-derived S3 object keys",
+      "Stripe webhook idempotency evidence",
+      "immutable GitHub Action references",
+      "explicit workflow token permissions"
+    ]
+  },
+  "coverage_semantics": {
+    "traversal": ["complete", "partial"],
+    "language_support": ["supported", "partial", "unsupported"],
+    "checker_support": "partial",
+    "match_enumeration": "mixed_first_only"
+  }
+}

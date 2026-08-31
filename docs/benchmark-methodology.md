@@ -2,12 +2,13 @@
 
 ## Claim boundary
 
-ContextSec v0.3 reports three quantitative result families and one case-study family. They are never pooled into one headline score.
+ContextSec v0.3 reports four quantitative result families and one case-study family. They are never pooled into one headline score.
 
 1. **Authored regression:** exact expectations for known detector, applicability, composition, and gate behavior.
 2. **Profile evaluation:** fully labeled synthetic repositories, including a frozen evaluation split that was still authored by the maintainer.
 3. **Mutation verification:** paired source/configuration variants that remove one supported security property.
 4. **Pinned real repositories:** manually reviewed public projects at exact commits.
+5. **Adversarial performance:** generated pathological files at the published single-file bound, evaluated for generous runtime ceilings, offset preservation, non-disclosure, and fail-closed malformed input.
 
 The first three prove repeatability within a published support matrix. The fourth tests scale, noisy layouts, and provenance. None is an independently sampled ecosystem benchmark.
 
@@ -35,6 +36,10 @@ Each mutation pair contains the minimum production files needed to activate one 
 
 The ten v0.3 mutations cover tenant predicates, tenant raw-query abstention, broad PII logging, whole-object AI egress, client-public secret namespaces, public upload ACLs, tenant-derived object keys, webhook idempotency evidence, immutable Action references, and explicit workflow permissions. A 100% score means 10/10 supported shapes changed as expected. It does not mean 116/116 controls have checkers.
 
+## Adversarial performance protocol
+
+`benchmarks/adversarial-performance/cases.json` generates six 500 KiB inputs: an unterminated JavaScript string, nested template expressions, SQL comment/operator boundaries, Python f-string boundaries, regex near matches, and malformed multiline TOML. CI uses a deliberately generous per-case ceiling instead of a microbenchmark. Each case must also preserve mask length, omit its seed value from masks and artifacts, and turn malformed manifests into partial coverage rather than a clean result. The ceiling is a regression guard on supported runners, not a universal CPU-time guarantee.
+
 ## Leakage and provenance
 
 Inline fixture paths are validated before materialization and cannot be absolute or contain traversal. Fixtures are written only to an operating-system temporary directory. The benchmark never imports or executes their code.
@@ -43,4 +48,4 @@ Real-repository labels, URLs, licenses, and full commit IDs live in `benchmarks/
 
 ## Next validity step
 
-The next meaningful accuracy claim requires labels from reviewers who did not implement the detector, a declared sampling frame, disagreements retained rather than silently reconciled, and results reported separately by framework and pack support. Until then, v0.3 remains a research preview.
+The next meaningful accuracy claim requires labels from reviewers who did not implement the detector, a declared sampling frame, disagreements retained rather than silently reconciled, and results reported separately by framework and pack support. [`external-evaluation-protocol.md`](external-evaluation-protocol.md) freezes those rules and the evaluator reports raw agreement plus Cohen's κ overall, per pack, and per framework. Until completed third-party evidence exists, v0.3 remains a research preview.

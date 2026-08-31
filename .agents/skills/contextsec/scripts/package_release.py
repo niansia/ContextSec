@@ -10,11 +10,15 @@ import zipfile
 from pathlib import Path
 from typing import Iterable, Optional, Sequence
 
+import safe_io
+import versioning
+
 REPOSITORY_ROOT = Path(__file__).resolve().parents[4]
 ALLOWLIST = (
     ".agents/skills/contextsec",
     ".github",
     "benchmarks",
+    "ci",
     "docs",
     "examples",
     "incidents",
@@ -22,6 +26,8 @@ ALLOWLIST = (
     ".gitignore",
     ".gitattributes",
     "CHANGELOG.md",
+    "CITATION.cff",
+    "CODE_OF_CONDUCT.md",
     "CONTRIBUTING.md",
     "LICENSE",
     "README.md",
@@ -37,6 +43,9 @@ EXCLUDED_PARTS = {
     "dist",
     "tmp",
 }
+DEFAULT_OUTPUT = (
+    REPOSITORY_ROOT / "dist" / ("contextsec-v" + versioning.TOOL_VERSION + ".zip")
+)
 
 
 def is_link_like(path: Path) -> bool:
@@ -73,7 +82,7 @@ def build_archive(output: Path, root: Path = REPOSITORY_ROOT) -> int:
     files = list(release_files(root))
     with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_STORED) as archive:
         for relative in files:
-            data = (root / relative).read_bytes()
+            data = safe_io.read_regular_file(root / relative)
             info = zipfile.ZipInfo(relative.as_posix(), date_time=(1980, 1, 1, 0, 0, 0))
             info.create_system = 3
             info.create_version = 20
@@ -86,7 +95,11 @@ def build_archive(output: Path, root: Path = REPOSITORY_ROOT) -> int:
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
     parser = argparse.ArgumentParser(description="Build a clean deterministic ContextSec release zip.")
-    parser.add_argument("--output", type=Path, default=REPOSITORY_ROOT / "dist" / "contextsec-v0.3.0.zip")
+    parser.add_argument(
+        "--output",
+        type=Path,
+        default=DEFAULT_OUTPUT,
+    )
     parser.add_argument("--list", action="store_true", help="List allowlisted files without writing an archive.")
     args = parser.parse_args(argv)
     try:

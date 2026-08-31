@@ -43,9 +43,9 @@ generate / review / test
 Control Ledger + evidence + release gate
 ```
 
-**Status:** research preview `v0.3.0`. Local-first, read-only profiling, no source upload, no target-code execution, and no third-party runtime dependency.
+**Status:** research preview `v0.3.1`. Local-first, read-only profiling, no source upload, no target-code execution, and no third-party runtime dependency.
 
-**Versioning:** Release/tool versions and artifact schema versions are independent. The current release and schemas are both `0.3.0`, but for different reasons: the artifact schemas moved from `0.2.1` to `0.3.0` because machine-readable stack support and profile/check binding changed their serialization contracts. A future release may retain an older compatible schema version.
+**Versioning:** Release/tool versions and artifact schema versions are independent and each has one canonical file. v0.3.1 advances the artifact schemas to `0.3.1` because the canonical schema namespace moved from an unowned domain to immutable release-tag URLs and traversal now records unsafe concurrent-file rejection explicitly.
 
 ## The decision pipeline
 
@@ -120,11 +120,13 @@ The profiler emits versioned observations, claims, routing, contradictions, and 
 - `subject_revision`: the bounded repository scope plus active decision-model digest evaluated by this run.
 - `source_inventory_digest`: the exact supported production file inventory shared by profiler and checker, used to reject mid-evaluation source changes.
 
-These hashes are integrity identifiers, not secrecy mechanisms. ContextSec never emits matched source lines or secret values; a low-entropy file may still be guessable from a digest.
+These hashes are integrity identifiers, not secrecy mechanisms. ContextSec never emits matched source lines or source-content values. Repository-relative filenames use bounded heuristic redaction by default and may themselves contain personal data; use `--path-privacy hashed` or `--path-privacy opaque` when filenames are sensitive. A low-entropy file may still be guessable from a content digest.
 
 ### Pack and control catalog
 
 [The machine-readable catalog](.agents/skills/contextsec/references/catalog.json) is the single source for pack order, claims, dependencies, per-control `applies_when` conditions, 16 risk packs, and 116 controls. Its [JSON Schema](.agents/skills/contextsec/references/catalog.schema.json) and semantic validator reject malformed fields—including string values masquerading as booleans. Human-readable pack files add implementation and verification guidance.
+
+The [machine-readable support matrix](.agents/skills/contextsec/references/support-matrix.json) is the source for profiler/checker manifests, suffixes, framework families, coverage semantics, and the ten published deterministic checker shapes. `contextsec doctor` reports that contract together with Python, tool, schema, detector, checker, and decision-model versions.
 
 ### Composition engine
 
@@ -206,6 +208,11 @@ The skill is the orchestration layer; `catalog.json`, composition rules, schemas
 
 ContextSec has a zero-dependency Python runtime. CI runs the full test suite and public benchmark CLI on Windows, macOS, and Ubuntu with Python 3.11–3.14.
 
+```bash
+python .agents/skills/contextsec/scripts/contextsec.py --version
+python .agents/skills/contextsec/scripts/contextsec.py doctor
+```
+
 #### Windows — PowerShell
 
 ```powershell
@@ -273,8 +280,9 @@ v0.3 keeps evidence classes separate:
 | Profile evaluation | 40 cases: 24 development + 16 frozen evaluation | macro F1 1.00; safety trigger recall 1.00; 0 false required activations | independent or representative accuracy |
 | Mutation verification | 10 single-edit pairs covering all 10 published checker shapes | 10/10 killed | coverage of all 116 controls or application tests |
 | Pinned real repositories | 4 exact public commits | 4/4 expected profiles reproduced | a statistically representative sample |
+| Adversarial performance | 6 generated pathological files at 500 KiB each | bounded runtime, offset preservation, non-disclosure, fail-closed malformed TOML | universal CPU bounds on every machine |
 
-The profile labels are maintainer-authored, including the frozen evaluation split. The real-repository suite requires existing local checkouts, verifies `HEAD`, and never clones or executes target code. See the [benchmark method](docs/benchmark-methodology.md) and [real-repository cases](docs/real-repo-cases.md).
+The profile labels are maintainer-authored, including the frozen evaluation split. The real-repository suite requires existing local checkouts, verifies `HEAD`, and never clones or executes target code. The [independent evaluation protocol](docs/external-evaluation-protocol.md) freezes sampling, two-reviewer raw labels, consensus separation, and agreement reporting without pretending those third-party labels already exist. See the [benchmark method](docs/benchmark-methodology.md) and [real-repository cases](docs/real-repo-cases.md).
 
 The [incident corpus](incidents) stores confirmed facts separately from ContextSec inferences and maps each case to trust boundaries, controls, and a proposed regression mutation. It currently includes Zeabur's ongoing 2026 investigation, tj-actions, Coinbase support insiders, Salesloft Drift OAuth abuse, and an NPM→GitHub OIDC→AWS control-plane pivot.
 
@@ -282,12 +290,13 @@ The [incident corpus](incidents) stores confirmed facts separately from ContextS
 
 - Parses bounded local text; never imports, builds, tests, or executes target code.
 - Never uses the network during profiling, checks, benchmark, or ledger evaluation.
-- Ignores repository symlinks and common dependency/generated directories.
+- Ignores repository symlinks and common dependency/generated directories. Files are opened by descriptor, compared with their pre-open identity, and checked again after reading; concurrent replacement or mutation becomes partial coverage.
 - Documentation, examples, fixtures, tests, non-workflow GitHub governance files, and development-only dependencies cannot create production claims.
 - Uses language-aware lexical policies so JavaScript `n--` and `#private`, Python f-string replacement fields, PostgreSQL hash operators, and MySQL no-space subtraction remain executable while supported comment forms are masked.
 - Separates template-literal prose from executable `${...}` expressions.
 - Reports `partial` traversal coverage for read, byte, encoding, or manifest gaps, and separately reports supported, partial, or unsupported stack coverage.
 - Parses `.env`-family files as key names only: values are discarded before hashing, evidence generation, or artifact output.
+- Supports `heuristic`, `hashed`, and `opaque` path-privacy modes across Profile, Checks, and Ledger artifacts.
 - Reports checker traversal, language support, checker support, and match enumeration separately.
 - Reads owner declarations only when explicitly supplied; declarations cannot erase contradictory code evidence.
 - Does not modify target source or configuration. Runtime bytecode writes are disabled; artifacts are written only to an explicitly supplied output path.
@@ -300,6 +309,8 @@ python -m unittest discover -s tests -v
 python -m compileall -q .agents/skills/contextsec/scripts tests
 python .agents/skills/contextsec/scripts/contextsec.py validate-catalog
 python .agents/skills/contextsec/scripts/contextsec.py benchmark --suite all
+python .agents/skills/contextsec/scripts/contextsec.py benchmark --suite adversarial
+python .agents/skills/contextsec/scripts/audit_ci.py --repo .
 python .agents/skills/contextsec/scripts/contextsec.py explain secrets-management --repo .
 ```
 
@@ -307,6 +318,7 @@ python .agents/skills/contextsec/scripts/contextsec.py explain secrets-managemen
 
 - Detectors are strongest for Node.js, Python dependency manifests, Next.js, FastAPI, Django, Prisma, Terraform, and common CI workflow shapes. Other stacks may need manual evidence or future adapters.
 - The lexical adapters are deterministic but are not full language parsers. Every detector needs positive/negative twins, and ambiguous evidence remains candidate or unknown.
+- Race-resistant descriptor reads reject observed replacement and in-place mutation, but ContextSec does not create an operating-system-wide atomic filesystem snapshot.
 - The built-in control checks cover ten narrow code/configuration shapes. Tenant CRUD checks enumerate every supported call in scope; several other checkers still enumerate only their first supported finding. The ledger exposes that coverage instead of implying completeness.
 - The subject revision and content digests bind bounded inputs; they are not a signed commit attestation and cannot prove skipped input safe.
 - Release evidence supplied by an owner still needs trustworthy test/configuration provenance. The ledger records the assertion; it cannot magically establish its truth.
@@ -316,13 +328,13 @@ python .agents/skills/contextsec/scripts/contextsec.py explain secrets-managemen
 ## Roadmap
 
 1. **v0.2.1 — applicability correctness:** language-aware lexical policy, one-profile subject binding, per-control applicability, flow-aware compositions, catalog validation, and cross-platform release metadata.
-2. **v0.3.0 — benchmark proof:** Python manifest/model profiling, detector positive/negative contracts, 40 labeled profile cases, 10 mutation pairs, 4 pinned real-repository cases, and Windows/macOS/Linux × Python 3.11–3.14 CI.
+2. **v0.3.1 — boundary and provenance hardening:** race-resistant reads, stdlib TOML, explicit path privacy, adversarial performance bounds, machine-readable support, hash-pinned validator dependencies, and attested immutable release automation.
 3. **v0.4 — independent ecosystem proof:** externally labeled holdout repositories, component-scoped monorepos, profile diff, signed artifacts, and comparative multi-agent evaluation.
 
 Read [architecture](docs/architecture.md), [competitive positioning](docs/competitive-positioning.md), [v0.2.1 review resolution](docs/review-resolution-v0.2.1.md), and [release roadmap](docs/roadmap.md) before proposing a large feature.
 
 ## Contributing and security
 
-Contributions are welcome, especially small detector twins, framework adapters, incident-to-regression maps, and mutation-backed controls. Read [CONTRIBUTING.md](CONTRIBUTING.md). Report vulnerabilities through [SECURITY.md](SECURITY.md), not a public issue.
+Contributions are welcome, especially small detector twins, framework adapters, incident-to-regression maps, and mutation-backed controls. Read [CONTRIBUTING.md](CONTRIBUTING.md) and the [Code of Conduct](CODE_OF_CONDUCT.md). Report vulnerabilities through [SECURITY.md](SECURITY.md), not a public issue. Research users can cite the project with [`CITATION.cff`](CITATION.cff).
 
 Apache-2.0 licensed. Control wording is original; external standards and incident sources are used for navigation and evidence, not copied as a checklist.

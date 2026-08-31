@@ -16,4 +16,6 @@ Useful reports include:
 
 Do not test against systems you do not own or control. Use minimal synthetic fixtures and redact sensitive data.
 
-The current profiler, checker, benchmark, and ledger are designed to be local, read-only by default, bounded, offline, and non-executing. A report showing a violation of one of those guarantees is high priority.
+The current profiler, checker, benchmark, and ledger are designed to be local, read-only by default, bounded, offline, and non-executing. Repository files are read through descriptors with pre-open/opened identity comparison and post-read stability checks. A report showing a bypass, including a symlink/reparse or concurrent replacement that escapes the selected root, is high priority.
+
+ContextSec does not create a system-wide atomic snapshot. For hostile local multi-process scenarios, evaluate an immutable checkout in an isolated environment in addition to relying on the built-in race-resistant reads.

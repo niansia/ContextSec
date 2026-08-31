@@ -11,10 +11,12 @@ import sys
 from pathlib import Path
 from typing import Any, List, Mapping, Optional, Sequence, Set
 
+import versioning
+
 REFERENCE_DIR = Path(__file__).resolve().parents[1] / "references"
 CATALOG = json.loads((REFERENCE_DIR / "catalog.json").read_text(encoding="utf-8"))
 PACKS = {item["id"] for item in CATALOG["packs"]}
-CHECKER_VERSION = "0.3.0"
+CHECKER_VERSION = versioning.TOOL_VERSION
 
 
 def digest(material: str) -> str:
@@ -47,7 +49,7 @@ def validate(payload: Mapping[str, Any]) -> List[str]:
         "checks",
         errors,
     )
-    if payload.get("schema_version") != "0.3.0":
+    if payload.get("schema_version") != versioning.SCHEMA_VERSION:
         errors.append("unsupported schema_version")
     active = payload.get("active_packs")
     if (

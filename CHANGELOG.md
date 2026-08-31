@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.3.1 — Boundary and release provenance hardening
+
+- Updated the non-executed composite example from Next.js 15.0.0 to 15.5.21 through Dependabot PR #7.
+- Replaced check-then-read repository access with descriptor reads that compare pre-open and opened identities, reject symlink/reparse replacements, and detect metadata changes through the read.
+- Replaced the hand-written PEP 621, Poetry, and Pipfile TOML subset with Python 3.11 `tomllib`; malformed production TOML now makes traversal partial.
+- Added heuristic, hashed, and opaque path-privacy modes and narrowed the artifact privacy claim to distinguish source-content non-disclosure from filename handling.
+- Added canonical tool/schema version files, `contextsec --version`, `contextsec doctor`, and a machine-readable support matrix used by profiler and checker constants.
+- Moved every JSON Schema `$id` from the unregistered `contextsec.dev` namespace to immutable `v0.3.1` source URLs and advanced artifact schemas to 0.3.1.
+- Added six generated 500 KiB adversarial performance/non-disclosure cases and removed an avoidable Python f-string substring path that amplified runtime.
+- Scoped the CI/CD OIDC capability detector to deployment or package-publication use, so provenance-only attestations do not trigger deployment controls.
+- Hash-pinned the Agent Skills validator's complete PyPI build/runtime closure while retaining the upstream full-commit source pin.
+- Added a tag-only draft-first release workflow that verifies version identity, rebuilds twice, compares bytes, publishes SHA256SUMS, creates artifact attestations, and only then publishes the release.
+- Added subject-bound CI policy evidence, real core-engine self-profiling, an external two-reviewer label protocol with Cohen's κ, `CITATION.cff`, and a Contributor Covenant-based Code of Conduct.
+
 ## 0.3.0 — Benchmark and mutation proof
 
 - Added a 40-case fully labeled profile corpus with 24 development and 16 frozen maintainer-authored evaluation cases, per-pack confusion counts, macro/micro F1, safety-critical recall, capability annotations, and false-required activation counts.

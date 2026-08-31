@@ -1,0 +1,13 @@
+{
+  "version": "0.3.1",
+  "method": "Generated pathological inputs stay below the published 512 KiB single-file bound. Every case must finish within a generous per-case ceiling, preserve lexical-mask offsets, avoid source-value disclosure, and fail closed on malformed manifests.",
+  "max_seconds_per_case": 15.0,
+  "cases": [
+    {"id": "unterminated-javascript-string", "recipe": "unterminated-js-string", "path": "src/input.ts", "bytes": 500000, "expected_coverage": "complete"},
+    {"id": "nested-template-expressions", "recipe": "template-expressions", "path": "src/template.ts", "bytes": 500000, "expected_coverage": "complete"},
+    {"id": "sql-comment-boundaries", "recipe": "sql-boundaries", "path": "queries/input.sql", "bytes": 500000, "expected_coverage": "complete"},
+    {"id": "python-fstring-boundaries", "recipe": "python-fstrings", "path": "service/input.py", "bytes": 500000, "expected_coverage": "complete"},
+    {"id": "regex-near-match-decoys", "recipe": "near-match-decoys", "path": "src/decoys.ts", "bytes": 500000, "expected_coverage": "complete"},
+    {"id": "malformed-multiline-toml", "recipe": "malformed-toml", "path": "pyproject.toml", "bytes": 500000, "expected_coverage": "partial"}
+  ]
+}

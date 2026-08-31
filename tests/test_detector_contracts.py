@@ -100,7 +100,10 @@ TEXT_CASES = {
     "feature-cicd-package-publish": (".github/workflows/release.yml", "run: npm publish\n"),
     "feature-cicd-cloud-deploy": (".github/workflows/deploy.yml", "run: terraform apply\n"),
     "feature-cicd-untrusted-pr": (".github/workflows/pr.yml", "pull_request:\n"),
-    "feature-cicd-oidc": (".github/workflows/deploy.yml", "id-token: write\n"),
+    "feature-cicd-oidc": (
+        ".github/workflows/deploy.yml",
+        "id-token: write\nrun: terraform apply\n",
+    ),
     "feature-support-impersonation": ("src/support.ts", "impersonate(userId);"),
     "feature-support-bulk-access": ("src/export.ts", "exportAllCustomers();"),
     "feature-high-impact-transaction": ("src/admin.ts", "deleteTenant(tenantId);"),
@@ -124,6 +127,10 @@ TARGETED_NEGATIVES = {
     "feature-web-sensitive-response": ("src/response.ts", "return NextResponse.json({ ok: true });"),
     "feature-auth-password-login": ("src/login.ts", "login({ passkey });"),
     "feature-user-controlled-destination": ("src/proxy.ts", 'fetch("https://example.com");'),
+    "feature-cicd-oidc": (
+        ".github/workflows/release.yml",
+        "id-token: write\nuses: actions/attest-build-provenance@0123456789012345678901234567890123456789\n",
+    ),
 }
 
 

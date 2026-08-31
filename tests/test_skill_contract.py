@@ -73,14 +73,18 @@ class SkillContractTests(unittest.TestCase):
                 encoding="utf-8"
             )
         )
-        self.assertEqual("0.3.0", schema["properties"]["schema_version"]["const"])
+        self.assertEqual(
+            PROFILER.SCHEMA_VERSION,
+            schema["properties"]["schema_version"]["const"],
+        )
         checks_schema = json.loads(
             (SKILL_ROOT / "references" / "control-checks.schema.json").read_text(
                 encoding="utf-8"
             )
         )
         self.assertEqual(
-            "0.3.0", checks_schema["properties"]["schema_version"]["const"]
+            PROFILER.SCHEMA_VERSION,
+            checks_schema["properties"]["schema_version"]["const"],
         )
         ledger_schema = json.loads(
             (SKILL_ROOT / "references" / "control-ledger.schema.json").read_text(
@@ -88,7 +92,8 @@ class SkillContractTests(unittest.TestCase):
             )
         )
         self.assertEqual(
-            "0.3.0", ledger_schema["properties"]["schema_version"]["const"]
+            PROFILER.SCHEMA_VERSION,
+            ledger_schema["properties"]["schema_version"]["const"],
         )
 
     def test_generated_profiles_pass_semantic_validation(self):
@@ -236,7 +241,7 @@ class SkillContractTests(unittest.TestCase):
         checks = CHECKER.check_repository(ROOT / "tests/fixtures/static-site")
         initial = LEDGER.build_ledger(profile, checks)
         evidence = {
-            "schema_version": "0.3.0",
+            "schema_version": PROFILER.SCHEMA_VERSION,
             "subject_revision": profile["subject"]["subject_revision"],
             "controls": [
                 {
@@ -357,7 +362,7 @@ class SkillContractTests(unittest.TestCase):
             ROOT / "examples" / "composite-saas", profile=profile
         )
         evidence = {
-            "schema_version": "0.3.0",
+            "schema_version": PROFILER.SCHEMA_VERSION,
             "subject_revision": profile["subject"]["subject_revision"],
             "controls": [
                 {
@@ -384,7 +389,7 @@ class SkillContractTests(unittest.TestCase):
             ROOT / "examples" / "composite-saas", profile=profile
         )
         evidence = {
-            "schema_version": "0.3.0",
+            "schema_version": PROFILER.SCHEMA_VERSION,
             "subject_revision": profile["subject"]["subject_revision"],
             "controls": [
                 {
@@ -422,7 +427,7 @@ class SkillContractTests(unittest.TestCase):
             ROOT / "examples" / "next-static", profile=profile
         )
         evidence = {
-            "schema_version": "0.3.0",
+            "schema_version": PROFILER.SCHEMA_VERSION,
             "subject_revision": profile["subject"]["subject_revision"],
             "controls": [],
             "waivers": [],
@@ -453,7 +458,7 @@ class SkillContractTests(unittest.TestCase):
             for control_id in blocker_ids
         ]
         evidence = {
-            "schema_version": "0.3.0",
+            "schema_version": PROFILER.SCHEMA_VERSION,
             "subject_revision": profile["subject"]["subject_revision"],
             "controls": [],
             "waivers": waivers,
@@ -491,7 +496,7 @@ class SkillContractTests(unittest.TestCase):
         )
         initial = LEDGER.build_ledger(profile, checks)
         evidence = {
-            "schema_version": "0.3.0",
+            "schema_version": PROFILER.SCHEMA_VERSION,
             "subject_revision": profile["subject"]["subject_revision"],
             "controls": [],
             "waivers": [

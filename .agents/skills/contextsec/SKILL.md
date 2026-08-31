@@ -4,7 +4,7 @@ description: Determine which security controls a product actually needs by profi
 license: Apache-2.0
 compatibility: Requires Python 3.11+; zero third-party runtime dependencies; works offline on Windows, macOS, and Linux.
 metadata:
-  version: "0.3.0"
+  version: "0.3.1"
   project: "ContextSec"
 ---
 
@@ -48,6 +48,8 @@ Use `<python>` below as an interpreter placeholder: `python` on Windows and `pyt
 ```
 
 The profiler is read-only by default and writes only when `--output` is explicitly supplied. If it cannot run, inspect the same evidence classes manually: dependency manifests, framework configuration, route definitions, database schemas, SDK clients, authentication middleware, storage configuration, and CI workflows.
+
+Repository-relative paths use bounded heuristic redaction by default. For repositories whose filenames may contain personal or confidential data, add `--path-privacy hashed` or `--path-privacy opaque` consistently to `profile`, `check`, and `gate`.
 
 Check both `coverage.status` and `coverage.language_support` before using the profile. Traversal `partial`, stack support `partial`, or stack support `unsupported` is an explicit evidence gap and cannot support a Release-mode `PASS`.
 

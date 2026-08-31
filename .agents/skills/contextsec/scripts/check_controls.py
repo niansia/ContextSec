@@ -18,20 +18,16 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
 import profile_repo  # noqa: E402
+import safe_io  # noqa: E402
+import support_matrix  # noqa: E402
+import versioning  # noqa: E402
 
-CHECKER_VERSION = "0.3.0"
+CHECKER_VERSION = versioning.TOOL_VERSION
 
-CHECKER_SUPPORTED_SUFFIXES = {
-    ".cjs",
-    ".js",
-    ".jsx",
-    ".mjs",
-    ".prisma",
-    ".ts",
-    ".tsx",
-    ".vue",
-}
-CHECKER_UNSUPPORTED_SUFFIXES = profile_repo.PROFILE_UNSUPPORTED_SUFFIXES | {".py"}
+CHECKER_SUPPORTED_SUFFIXES = support_matrix.values("checker", "supported_suffixes")
+CHECKER_UNSUPPORTED_SUFFIXES = support_matrix.values(
+    "checker", "unsupported_suffixes"
+)
 
 
 def checker_stack_family(relative: Path) -> str:
@@ -55,10 +51,15 @@ def digest(material: bytes) -> str:
 
 
 def location(
-    relative: str, text: str, start: int, checker_id: str, raw: bytes
+    relative: str,
+    text: str,
+    start: int,
+    checker_id: str,
+    raw: bytes,
+    path_privacy: str = "heuristic",
 ) -> Dict[str, str]:
     locator = "line:" + str(profile_repo.line_number(text, start))
-    safe_path = profile_repo.redact_path(relative)
+    safe_path = profile_repo.redact_path(relative, path_privacy)
     evidence_id = digest(
         "\x1f".join(("evidence", safe_path, locator, checker_id, CHECKER_VERSION)).encode(
             "utf-8"
@@ -149,20 +150,24 @@ def load_sources(
         stack_family = checker_stack_family(relative_path)
         supported_stack_seen = supported_stack_seen or stack_family == "supported"
         unsupported_stack_seen = unsupported_stack_seen or stack_family == "unsupported"
+        remaining_total = max_total_bytes - bytes_scanned
+        if remaining_total < 1:
+            partial = True
+            break
         try:
-            size = path.stat().st_size
-        except OSError:
+            raw = safe_io.read_regular_file(
+                path, min(max_file_bytes, remaining_total)
+            )
+        except safe_io.FileSizeLimitError as exc:
             partial = True
-            scope_material.append(relative + "\x1funreadable")
-            continue
-        if size > max_file_bytes or bytes_scanned + size > max_total_bytes:
-            partial = True
-            scope_material.append(relative + "\x1fskipped-size=" + str(size))
-            if bytes_scanned + size > max_total_bytes:
+            scope_material.append(relative + "\x1fskipped-size=" + str(exc.size))
+            if remaining_total <= max_file_bytes:
                 break
             continue
-        try:
-            raw = path.read_bytes()
+        except safe_io.UnsafeFileError:
+            partial = True
+            scope_material.append(relative + "\x1funsafe-file")
+            continue
         except OSError:
             partial = True
             scope_material.append(relative + "\x1funreadable")
@@ -244,7 +249,9 @@ def prisma_models_with_fields(
 
 
 def check_tenant_queries(
-    sources: Sequence[Tuple[str, str, bytes]], active: Sequence[str]
+    sources: Sequence[Tuple[str, str, bytes]],
+    active: Sequence[str],
+    path_privacy: str = "heuristic",
 ) -> List[Dict[str, Any]]:
     if not {"multi-tenant", "api-inbound"} <= set(active):
         return []
@@ -292,7 +299,8 @@ def check_tenant_queries(
                         "A caller-controlled object identifier can cross the tenant boundary.",
                         "Inbound identifier -> database lookup by object id only -> tenant-owned record response or processing.",
                         location(
-                            relative, text, match.start(), "TENANT-QUERY-001", raw
+                            relative, text, match.start(), "TENANT-QUERY-001", raw,
+                            path_privacy,
                         ),
                         "Supported inline Prisma "
                         + match.group("operation")
@@ -303,7 +311,9 @@ def check_tenant_queries(
 
 
 def check_tenant_raw_queries(
-    sources: Sequence[Tuple[str, str, bytes]], active: Sequence[str]
+    sources: Sequence[Tuple[str, str, bytes]],
+    active: Sequence[str],
+    path_privacy: str = "heuristic",
 ) -> List[Dict[str, Any]]:
     if not {"multi-tenant", "api-inbound"} <= set(active):
         return []
@@ -326,7 +336,7 @@ def check_tenant_raw_queries(
                     "Raw Prisma query requires explicit tenant-scope verification",
                     "A raw query can bypass ORM-level tenant predicates and cross the tenant boundary.",
                     "Inbound request -> raw SQL execution -> tenant-owned rows without a mechanically verified scope.",
-                    location(relative, text, match.start(), "TENANT-RAW-QUERY-001", raw),
+                    location(relative, text, match.start(), "TENANT-RAW-QUERY-001", raw, path_privacy),
                     "ContextSec found a supported Prisma raw-query call but does not parse SQL deeply enough to verify its tenant predicate.",
                 )
             )
@@ -334,7 +344,9 @@ def check_tenant_raw_queries(
 
 
 def check_pii_logging(
-    sources: Sequence[Tuple[str, str, bytes]], active: Sequence[str]
+    sources: Sequence[Tuple[str, str, bytes]],
+    active: Sequence[str],
+    path_privacy: str = "heuristic",
 ) -> List[Dict[str, Any]]:
     if "privacy-pii" not in active:
         return []
@@ -373,7 +385,7 @@ def check_pii_logging(
                         "Sensitive database object is written to an application log",
                         "Logs can retain and redistribute fields beyond their intended access and retention boundary.",
                         "PII-bearing Prisma result -> broad console logging sink.",
-                        location(relative, text, sink.start(), "PII-LOG-001", raw),
+                        location(relative, text, sink.start(), "PII-LOG-001", raw, path_privacy),
                         "A supported Prisma model with PII fields flowed by variable identity to a same-file console logging sink.",
                     )
                 ]
@@ -381,7 +393,9 @@ def check_pii_logging(
 
 
 def check_ai_egress(
-    sources: Sequence[Tuple[str, str, bytes]], active: Sequence[str]
+    sources: Sequence[Tuple[str, str, bytes]],
+    active: Sequence[str],
+    path_privacy: str = "heuristic",
 ) -> List[Dict[str, Any]]:
     if not {"privacy-pii", "ai-rag-agent", "external-api"} <= set(active):
         return []
@@ -442,7 +456,7 @@ def check_ai_egress(
                             "Unprojected database object is sent to an AI provider",
                             "Tenant and personal data can leave the application without field minimization or an explicit egress boundary.",
                             "PII-bearing Prisma result -> full-object serialization in model request input.",
-                            location(relative, text, offset, "AI-PII-EGRESS-001", raw),
+                            location(relative, text, offset, "AI-PII-EGRESS-001", raw, path_privacy),
                             "A supported Prisma model with PII fields flowed by variable identity into the input/messages field of a same-file model call.",
                         )
                     ]
@@ -651,7 +665,9 @@ def _tenant_identity_use(expression: str) -> Optional[int]:
 
 
 def check_client_public_secrets(
-    sources: Sequence[Tuple[str, str, bytes]], active: Sequence[str]
+    sources: Sequence[Tuple[str, str, bytes]],
+    active: Sequence[str],
+    path_privacy: str = "heuristic",
 ) -> List[Dict[str, Any]]:
     del active
     code_pattern = re.compile(
@@ -685,7 +701,7 @@ def check_client_public_secrets(
                     "Secret-bearing environment name is exposed to client code",
                     "A build-time public namespace can embed the corresponding credential in browser-delivered assets.",
                     "Server credential -> public framework environment namespace -> client bundle or browser runtime.",
-                    location(relative, text, match.start(), "CLIENT-PUBLIC-SECRET-001", raw),
+                    location(relative, text, match.start(), "CLIENT-PUBLIC-SECRET-001", raw, path_privacy),
                     "The key name, not its value, matched a supported Next.js, Vite, or Create React App public namespace and an unambiguously secret-bearing token.",
                 )
             )
@@ -693,7 +709,9 @@ def check_client_public_secrets(
 
 
 def check_public_upload(
-    sources: Sequence[Tuple[str, str, bytes]], active: Sequence[str]
+    sources: Sequence[Tuple[str, str, bytes]],
+    active: Sequence[str],
+    path_privacy: str = "heuristic",
 ) -> List[Dict[str, Any]]:
     if "file-upload" not in active:
         return []
@@ -723,7 +741,7 @@ def check_public_upload(
                         "Uploaded object is explicitly made public",
                         "An anonymous or weakly authorized upload can become attacker-controlled public content.",
                         "Inbound multipart file -> object storage write -> public-read ACL.",
-                        location(relative, text, offset, "UPLOAD-PUBLIC-001", raw),
+                        location(relative, text, offset, "UPLOAD-PUBLIC-001", raw, path_privacy),
                         "The object passed to a supported S3 PutObjectCommand contained an explicit public-read ACL.",
                     )
                 ]
@@ -731,7 +749,9 @@ def check_public_upload(
 
 
 def check_upload_tenant_binding(
-    sources: Sequence[Tuple[str, str, bytes]], active: Sequence[str]
+    sources: Sequence[Tuple[str, str, bytes]],
+    active: Sequence[str],
+    path_privacy: str = "heuristic",
 ) -> List[Dict[str, Any]]:
     if not {"file-upload", "multi-tenant"} <= set(active):
         return []
@@ -769,6 +789,7 @@ def check_upload_tenant_binding(
                             offset,
                             "UPLOAD-TENANT-FLOW-001",
                             raw,
+                            path_privacy,
                         ),
                         "A supported PutObjectCommand Key property contained a tenant identity inside the same bounded expression.",
                     )
@@ -777,7 +798,9 @@ def check_upload_tenant_binding(
 
 
 def check_payment_idempotency(
-    sources: Sequence[Tuple[str, str, bytes]], active: Sequence[str]
+    sources: Sequence[Tuple[str, str, bytes]],
+    active: Sequence[str],
+    path_privacy: str = "heuristic",
 ) -> List[Dict[str, Any]]:
     if "payments" not in active:
         return []
@@ -802,7 +825,8 @@ def check_payment_idempotency(
                     "A provider retry may repeat fulfillment or state changes if deduplication is absent.",
                     "Repeated signed event -> webhook handler -> potentially repeated business transition.",
                     location(
-                        relative, text, match.start(), "PAYMENT-IDEMPOTENCY-001", raw
+                        relative, text, match.start(), "PAYMENT-IDEMPOTENCY-001", raw,
+                        path_privacy,
                     ),
                     "A verified-provider webhook call was present, but the supported lexical guard set found no event-id ledger or dedupe operation; no mutation test was run.",
                 )
@@ -811,7 +835,9 @@ def check_payment_idempotency(
 
 
 def check_cicd_action_pins(
-    sources: Sequence[Tuple[str, str, bytes]], active: Sequence[str]
+    sources: Sequence[Tuple[str, str, bytes]],
+    active: Sequence[str],
+    path_privacy: str = "heuristic",
 ) -> List[Dict[str, Any]]:
     if "cicd-supply-chain" not in active:
         return []
@@ -840,7 +866,7 @@ def check_cicd_action_pins(
                     "Third-party workflow action is not pinned to an immutable digest",
                     "A mutable tag or branch can be repointed after review and execute with workflow authority.",
                     "Workflow uses reference -> upstream reference changes -> unreviewed code executes in CI.",
-                    location(relative, text, match.start("value"), "CICD-ACTION-PIN-001", raw),
+                    location(relative, text, match.start("value"), "CICD-ACTION-PIN-001", raw, path_privacy),
                     "A non-local uses reference was not a 40- or 64-character hexadecimal digest.",
                 )
             )
@@ -848,7 +874,9 @@ def check_cicd_action_pins(
 
 
 def check_cicd_declared_permissions(
-    sources: Sequence[Tuple[str, str, bytes]], active: Sequence[str]
+    sources: Sequence[Tuple[str, str, bytes]],
+    active: Sequence[str],
+    path_privacy: str = "heuristic",
 ) -> List[Dict[str, Any]]:
     if "cicd-supply-chain" not in active:
         return []
@@ -874,7 +902,7 @@ def check_cicd_declared_permissions(
                 "Workflow does not declare a top-level token permission baseline",
                 "Repository or organization defaults can grant more workflow authority than the file makes reviewable.",
                 "Workflow trigger -> implicit platform token permissions -> build step receives repository authority.",
-                location(relative, text, 0, "CICD-PERMISSIONS-001", raw),
+                location(relative, text, 0, "CICD-PERMISSIONS-001", raw, path_privacy),
                 "The workflow contained no unindented top-level permissions mapping; effective platform defaults were not queried.",
             )
         )
@@ -882,15 +910,26 @@ def check_cicd_declared_permissions(
 
 
 def check_repository(
-    root: Path, profile: Optional[Mapping[str, Any]] = None
+    root: Path,
+    profile: Optional[Mapping[str, Any]] = None,
+    path_privacy: str = "heuristic",
 ) -> Dict[str, Any]:
     root = root.resolve(strict=True)
     if profile is None:
-        profile = profile_repo.profile_repository(root)
+        profile = profile_repo.profile_repository(root, path_privacy=path_privacy)
+    else:
+        matching_modes = [
+            mode
+            for mode in profile_repo.PATH_PRIVACY_MODES
+            if profile.get("subject", {}).get("repository")
+            == profile_repo.redact_path(root.name, mode)
+        ]
+        if matching_modes:
+            path_privacy = matching_modes[0]
     if profile.get("schema_version") != profile_repo.SCHEMA_VERSION:
         raise ValueError("Profile schema_version does not match this checker.")
     if profile.get("subject", {}).get("repository") != profile_repo.redact_path(
-        root.name
+        root.name, path_privacy
     ):
         raise ValueError("Profile repository does not match the checker repository.")
     if profile.get("subject", {}).get(
@@ -918,7 +957,7 @@ def check_repository(
         check_cicd_action_pins,
         check_cicd_declared_permissions,
     ):
-        findings.extend(checker(sources, active))
+        findings.extend(checker(sources, active, path_privacy))
     findings.sort(key=lambda item: item["id"])
     for item in findings:
         item["evidence"]["subject_revision"] = profile["subject"][
@@ -952,8 +991,8 @@ def check_repository(
             "checker_coverage": {
                 "traversal": checker_coverage["status"],
                 "language_support": checker_coverage["language_support"],
-                "checker_support": "partial",
-                "match_enumeration": "mixed_first_only"
+                "checker_support": support_matrix.SUPPORT_MATRIX["coverage_semantics"]["checker_support"],
+                "match_enumeration": support_matrix.SUPPORT_MATRIX["coverage_semantics"]["match_enumeration"]
             },
             "checker_input_hash": checker_hash,
         },
@@ -975,9 +1014,14 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     )
     parser.add_argument("--repo", default=".")
     parser.add_argument("--output")
+    parser.add_argument(
+        "--path-privacy",
+        choices=profile_repo.PATH_PRIVACY_MODES,
+        default="heuristic",
+    )
     args = parser.parse_args(argv)
     try:
-        result = check_repository(Path(args.repo))
+        result = check_repository(Path(args.repo), path_privacy=args.path_privacy)
         rendered = (
             json.dumps(result, indent=2, sort_keys=True, ensure_ascii=False) + "\n"
         )

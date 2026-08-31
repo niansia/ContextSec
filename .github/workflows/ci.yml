@@ -51,6 +51,8 @@ jobs:
           python-version: "3.14"
       - name: Run all offline benchmark suites
         run: python .agents/skills/contextsec/scripts/contextsec.py benchmark --suite all
+      - name: Run adversarial complexity and non-disclosure suite
+        run: python .agents/skills/contextsec/scripts/contextsec.py benchmark --suite adversarial
       - name: Validate decision catalogs
         run: python .agents/skills/contextsec/scripts/contextsec.py validate-catalog
       - name: Verify clean release allowlist
@@ -60,14 +62,17 @@ jobs:
           python .agents/skills/contextsec/scripts/package_release.py --output /tmp/contextsec-first.zip
           python .agents/skills/contextsec/scripts/package_release.py --output /tmp/contextsec-second.zip
           cmp /tmp/contextsec-first.zip /tmp/contextsec-second.zip
-      - name: Dogfood profile, checks, and ledger
+      - name: Dogfood repository and core-engine profiles, checks, evidence, and ledger
         run: |
-          python .agents/skills/contextsec/scripts/contextsec.py profile --repo . --output contextsec-profile.json
-          python .agents/skills/contextsec/scripts/contextsec.py validate-profile contextsec-profile.json
-          python .agents/skills/contextsec/scripts/contextsec.py check --repo . --output contextsec-checks.json
-          python .agents/skills/contextsec/scripts/contextsec.py validate-checks contextsec-checks.json
-          python .agents/skills/contextsec/scripts/contextsec.py gate --repo examples/next-static --output contextsec-ledger.json
-          python .agents/skills/contextsec/scripts/contextsec.py validate-ledger contextsec-ledger.json
+          python .agents/skills/contextsec/scripts/contextsec.py profile --repo . --output /tmp/contextsec-profile.json
+          python .agents/skills/contextsec/scripts/contextsec.py validate-profile /tmp/contextsec-profile.json
+          python .agents/skills/contextsec/scripts/contextsec.py profile --repo .agents/skills/contextsec --output /tmp/contextsec-core-profile.json
+          python .agents/skills/contextsec/scripts/contextsec.py validate-profile /tmp/contextsec-core-profile.json
+          python .agents/skills/contextsec/scripts/contextsec.py check --repo . --output /tmp/contextsec-checks.json
+          python .agents/skills/contextsec/scripts/contextsec.py validate-checks /tmp/contextsec-checks.json
+          python .agents/skills/contextsec/scripts/audit_ci.py --repo . --profile /tmp/contextsec-profile.json --output /tmp/contextsec-ci-evidence.json
+          python .agents/skills/contextsec/scripts/contextsec.py gate --repo . --evidence /tmp/contextsec-ci-evidence.json --output /tmp/contextsec-ledger.json
+          python .agents/skills/contextsec/scripts/contextsec.py validate-ledger /tmp/contextsec-ledger.json
 
   agent-skill-spec:
     runs-on: ubuntu-latest
@@ -88,8 +93,10 @@ jobs:
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.14"
-      - name: Install the pinned reference validator
-        run: python -m pip install ./.vendor/agentskills/skills-ref
+      - name: Install hash-pinned validator build and runtime dependencies
+        run: 'python -m pip install --disable-pip-version-check --only-binary=:all: --require-hashes -r ci/agent-skills-validator-requirements.txt'
+      - name: Install the commit-pinned reference validator without dependency resolution
+        run: python -m pip install --disable-pip-version-check --no-build-isolation --no-deps ./.vendor/agentskills/skills-ref
       - name: Validate the ContextSec skill
         run: skills-ref validate .agents/skills/contextsec
 

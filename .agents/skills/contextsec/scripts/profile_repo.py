@@ -16,12 +16,17 @@ import re
 import stat
 import sys
 import tempfile
+import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
-SCHEMA_VERSION = "0.3.0"
-DETECTOR_VERSION = "0.3.0"
+import safe_io
+import support_matrix
+import versioning
+
+SCHEMA_VERSION = versioning.SCHEMA_VERSION
+DETECTOR_VERSION = versioning.TOOL_VERSION
 DEFAULT_MAX_FILES = 10_000
 DEFAULT_MAX_FILE_BYTES = 512 * 1024
 DEFAULT_MAX_TOTAL_BYTES = 50 * 1024 * 1024
@@ -201,51 +206,15 @@ SOURCE_SUFFIXES = {
     ".yml",
 }
 
-PROFILE_SUPPORTED_MANIFESTS = {
-    "package.json",
-    "pyproject.toml",
-    "requirements.txt",
-    "requirements.in",
-    "Pipfile",
-}
-PROFILE_UNSUPPORTED_MANIFESTS = {
-    "Gemfile",
-    "go.mod",
-    "Cargo.toml",
-    "pom.xml",
-    "build.gradle",
-    "build.gradle.kts",
-    "composer.json",
-}
-PROFILE_SUPPORTED_SUFFIXES = {
-    ".cjs",
-    ".js",
-    ".jsx",
-    ".mjs",
-    ".prisma",
-    ".py",
-    ".sql",
-    ".tf",
-    ".ts",
-    ".tsx",
-    ".vue",
-}
-PROFILE_UNSUPPORTED_SUFFIXES = {
-    ".c",
-    ".cc",
-    ".cpp",
-    ".cs",
-    ".dart",
-    ".go",
-    ".java",
-    ".kt",
-    ".kts",
-    ".php",
-    ".rb",
-    ".rs",
-    ".scala",
-    ".swift",
-}
+PROFILE_SUPPORTED_MANIFESTS = support_matrix.values("profile", "supported_manifests")
+PROFILE_UNSUPPORTED_MANIFESTS = support_matrix.values(
+    "profile", "unsupported_manifests"
+)
+PROFILE_SUPPORTED_SUFFIXES = support_matrix.values("profile", "supported_suffixes")
+PROFILE_UNSUPPORTED_SUFFIXES = support_matrix.values(
+    "profile", "unsupported_suffixes"
+)
+PATH_PRIVACY_MODES = ("heuristic", "hashed", "opaque")
 
 TENANT_KEY_PATTERN = (
     r"tenantId|tenant_id|organizationId|organization_id|workspaceId|workspace_id|"
@@ -1110,7 +1079,11 @@ TEXT_DETECTORS = (
         "cicd.oidc",
         "feature",
         "high",
-        (r"\bid-token\s*:\s*write\b",),
+        (
+            r"\bid-token\s*:\s*write\b",
+            r"(?:npm\s+publish|twine\s+upload|terraform\s+apply|\bkubectl\b|aws-actions/configure-aws-credentials|google-github-actions/auth|azure/login)",
+        ),
+        minimum_distinct=2,
         required_suffixes=(".yaml", ".yml"),
     ),
     TextDetector(
@@ -1222,7 +1195,13 @@ def sha256_text(value: str) -> str:
     )
 
 
-def redact_path(value: str) -> str:
+def redact_path(value: str, mode: str = "heuristic") -> str:
+    if mode not in PATH_PRIVACY_MODES:
+        raise ValueError("Unsupported path privacy mode: " + mode)
+    if mode == "hashed":
+        return "path-sha256:" + hashlib.sha256(value.encode("utf-8")).hexdigest()
+    if mode == "opaque":
+        return "[path:" + hashlib.sha256(value.encode("utf-8")).hexdigest()[:12] + "]"
     redacted = re.sub(
         r"(?i)[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}",
         "[redacted-email]",
@@ -1326,7 +1305,7 @@ def profile_stack_family(relative: Path) -> str:
 
 
 def has_reparse_attribute(stat_result: Any) -> bool:
-    attributes = getattr(stat_result, "st_file_attributes", 0)
+    attributes = getattr(stat_result, "st_file_attributes", 0) or 0
     return bool(attributes & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0))
 
 
@@ -1351,11 +1330,13 @@ def make_observation(
     kind: str,
     confidence: str,
     scope: str,
+    path_privacy: str = "heuristic",
 ) -> Dict[str, Any]:
+    safe_path = redact_path(relative, path_privacy)
     evidence_id = sha256_text(
-        "evidence\x1f" + "\x1f".join((relative, locator, detector_id, DETECTOR_VERSION))
+        "evidence\x1f" + "\x1f".join((safe_path, locator, detector_id, DETECTOR_VERSION))
     )
-    location_id = sha256_text("location\x1f" + "\x1f".join((relative, locator)))
+    location_id = sha256_text("location\x1f" + "\x1f".join((safe_path, locator)))
     fingerprint = sha256_text(
         "fingerprint\x1f" + "\x1f".join((evidence_id, content_digest))
     )
@@ -1369,7 +1350,7 @@ def make_observation(
         "confidence": confidence,
         "detector": {"id": detector_id, "version": DETECTOR_VERSION},
         "evidence": {
-            "path": redact_path(relative),
+            "path": safe_path,
             "locator": locator,
             "evidence_id": evidence_id,
             "location_id": location_id,
@@ -1380,7 +1361,9 @@ def make_observation(
     }
 
 
-def inspect_package_json(relative: str, text: str, scope: str) -> List[Dict[str, Any]]:
+def inspect_package_json(
+    relative: str, text: str, scope: str, path_privacy: str = "heuristic"
+) -> List[Dict[str, Any]]:
     if scope != "production" or Path(relative).name != "package.json":
         return []
     try:
@@ -1410,6 +1393,7 @@ def inspect_package_json(relative: str, text: str, scope: str) -> List[Dict[str,
                     "dependency",
                     confidence,
                     scope,
+                    path_privacy,
                 )
             )
     return observations
@@ -1448,17 +1432,8 @@ def _dependency_name(specification: str) -> Optional[str]:
     return re.sub(r"[-_.]+", "-", match.group(0)).lower()
 
 
-def _quoted_values(text: str) -> List[str]:
-    return [
-        match.group("value")
-        for match in re.finditer(
-            r"(?P<quote>['\"])(?P<value>(?:\\.|(?!\1).)*)\1", text
-        )
-    ]
-
-
 def python_dependency_specs(relative: str, text: str) -> List[str]:
-    """Extract production Python requirements from a conservative manifest subset."""
+    """Extract production Python requirements with the Python 3.11 TOML parser."""
 
     name = Path(relative).name.lower()
     if name in {"requirements.txt", "requirements.in"}:
@@ -1469,58 +1444,34 @@ def python_dependency_specs(relative: str, text: str) -> List[str]:
             and not cleaned.lstrip().startswith(("-r", "--requirement", "-e"))
         ]
 
-    if name == "pipfile":
-        section = ""
-        specs: List[str] = []
-        for raw_line in text.splitlines():
-            line = _strip_manifest_comment(raw_line).strip()
-            header = re.fullmatch(r"\[([^]]+)\]", line)
-            if header:
-                section = header.group(1).strip().lower()
-                continue
-            if section != "packages" or "=" not in line:
-                continue
-            package = line.split("=", 1)[0].strip().strip("'\"")
-            if package:
-                specs.append(package)
-        return specs
-
-    if name != "pyproject.toml":
+    if name not in {"pipfile", "pyproject.toml"}:
         return []
+    payload = tomllib.loads(text)
+    if name == "pipfile":
+        packages = payload.get("packages", {})
+        return sorted(packages) if isinstance(packages, dict) else []
 
-    section = ""
-    collecting_project_dependencies = False
-    dependency_buffer: List[str] = []
-    specs = []
-    for raw_line in text.splitlines():
-        line = _strip_manifest_comment(raw_line).strip()
-        header = re.fullmatch(r"\[([^]]+)\]", line)
-        if header:
-            section = header.group(1).strip().lower()
-            collecting_project_dependencies = False
-            continue
-        if section == "project" and re.match(r"^dependencies\s*=", line):
-            collecting_project_dependencies = True
-            dependency_buffer.append(line.split("=", 1)[1])
-            if "]" in line.split("=", 1)[1]:
-                collecting_project_dependencies = False
-            continue
-        if collecting_project_dependencies:
-            dependency_buffer.append(line)
-            if "]" in line:
-                collecting_project_dependencies = False
-            continue
-        if section == "tool.poetry.dependencies" and "=" in line:
-            package = line.split("=", 1)[0].strip().strip("'\"")
-            if package.lower() != "python" and package:
-                specs.append(package)
-
-    specs.extend(_quoted_values("\n".join(dependency_buffer)))
+    specs: List[str] = []
+    project = payload.get("project", {})
+    dependencies = project.get("dependencies", []) if isinstance(project, dict) else []
+    if isinstance(dependencies, list):
+        specs.extend(item for item in dependencies if isinstance(item, str))
+    tool = payload.get("tool", {})
+    poetry = tool.get("poetry", {}) if isinstance(tool, dict) else {}
+    poetry_dependencies = (
+        poetry.get("dependencies", {}) if isinstance(poetry, dict) else {}
+    )
+    if isinstance(poetry_dependencies, dict):
+        specs.extend(
+            key
+            for key in poetry_dependencies
+            if isinstance(key, str) and key.lower() != "python"
+        )
     return specs
 
 
 def inspect_python_manifest(
-    relative: str, text: str, scope: str
+    relative: str, text: str, scope: str, path_privacy: str = "heuristic"
 ) -> List[Dict[str, Any]]:
     if scope != "production":
         return []
@@ -1544,12 +1495,15 @@ def inspect_python_manifest(
                 "dependency",
                 confidence,
                 scope,
+                path_privacy,
             )
         )
     return observations
 
 
-def inspect_text(relative: str, text: str, scope: str) -> List[Dict[str, Any]]:
+def inspect_text(
+    relative: str, text: str, scope: str, path_privacy: str = "heuristic"
+) -> List[Dict[str, Any]]:
     if scope != "production":
         return []
     observations: List[Dict[str, Any]] = []
@@ -1599,6 +1553,7 @@ def inspect_text(relative: str, text: str, scope: str) -> List[Dict[str, Any]]:
                 detector.kind,
                 detector.confidence,
                 scope,
+                path_privacy,
             )
         )
     return observations
@@ -1705,6 +1660,9 @@ def mask_comments_and_strings(
     length = len(text)
     index = 0
     frames: List[Dict[str, Any]] = [{"kind": "code", "template_expr": False}]
+    python_fstring_prefix = re.compile(
+        r"(?i:(?:f|fr|rf))(?P<quote>'''|\"\"\"|'|\")"
+    )
 
     def mask(position: int) -> None:
         if text[position] not in {"\r", "\n"}:
@@ -1792,10 +1750,7 @@ def mask_comments_and_strings(
                 index += 1
                 continue
             if language == "python" and (index == 0 or not re.match(r"[A-Za-z0-9_]", text[index - 1])):
-                prefix_match = re.match(
-                    r"(?i:(?:f|fr|rf))(?P<quote>'''|\"\"\"|'|\")",
-                    text[index:],
-                )
+                prefix_match = python_fstring_prefix.match(text, index)
                 if prefix_match is not None:
                     token = prefix_match.group(0)
                     quote = prefix_match.group("quote")
@@ -2053,10 +2008,10 @@ def load_declarations(path: Optional[Path]) -> Dict[str, bool]:
     if path is None:
         return {}
     try:
-        raw = path.read_bytes()
-        if len(raw) > MAX_CONTEXT_BYTES:
-            raise ValueError("Context declaration exceeds the 64 KiB input limit.")
+        raw = safe_io.read_regular_file(path, MAX_CONTEXT_BYTES)
         payload = strict_json_loads(raw.decode("utf-8-sig"))
+    except safe_io.FileSizeLimitError as exc:
+        raise ValueError("Context declaration exceeds the 64 KiB input limit.") from exc
     except (OSError, ValueError, RecursionError) as exc:
         raise ValueError(
             "Unable to read context declaration JSON: " + str(exc)
@@ -2269,10 +2224,13 @@ def profile_repository(
     max_files: int = DEFAULT_MAX_FILES,
     max_file_bytes: int = DEFAULT_MAX_FILE_BYTES,
     max_total_bytes: int = DEFAULT_MAX_TOTAL_BYTES,
+    path_privacy: str = "heuristic",
 ) -> Dict[str, Any]:
     root = root.resolve(strict=True)
     if not root.is_dir():
         raise ValueError("Repository root is not a directory: " + str(root))
+    if path_privacy not in PATH_PRIVACY_MODES:
+        raise ValueError("Unsupported path privacy mode: " + path_privacy)
     declarations = load_declarations(context_file)
     observations: List[Dict[str, Any]] = []
     file_hashes: List[str] = []
@@ -2288,6 +2246,7 @@ def profile_repository(
         "total_byte_limit": 0,
         "stat_error": 0,
         "read_error": 0,
+        "unsafe_file": 0,
         "binary": 0,
         "invalid_encoding": 0,
         "invalid_manifest": 0,
@@ -2300,6 +2259,9 @@ def profile_repository(
         "v0.3 detectors are strongest for Node.js, Python manifests, Next.js, FastAPI, Django, Prisma, Terraform, and common CI workflow shapes; other stacks may need manual profiling.",
         "Documentation, tests, fixtures, generated output, dependencies, and symlinks do not drive routing.",
         "No target code, build, test, scanner, network call, or compliance assessment was executed.",
+        "Source-content values are never emitted; repository-relative paths use the "
+        + path_privacy
+        + " privacy mode.",
     ]
 
     for path in iter_repository_files(root, walk_stats, max_entries):
@@ -2320,19 +2282,23 @@ def profile_repository(
         stack_family = profile_stack_family(relative_path)
         supported_stack_seen = supported_stack_seen or stack_family == "supported"
         unsupported_stack_seen = unsupported_stack_seen or stack_family == "unsupported"
+        remaining_total = max_total_bytes - bytes_scanned
+        if remaining_total < 1:
+            partial = True
+            skip_counts["total_byte_limit"] += 1
+            limitations.append(
+                "Total byte limit reached; remaining files were not scanned."
+            )
+            break
         try:
-            size = path.stat().st_size
-        except OSError:
+            raw = safe_io.read_regular_file(
+                path, min(max_file_bytes, remaining_total)
+            )
+        except safe_io.FileSizeLimitError as exc:
             files_skipped += 1
             partial = True
-            skip_counts["stat_error"] += 1
-            file_hashes.append(relative + "\x1funreadable")
-            continue
-        if size > max_file_bytes or bytes_scanned + size > max_total_bytes:
-            files_skipped += 1
-            partial = True
-            file_hashes.append(relative + "\x1fskipped-size=" + str(size))
-            if bytes_scanned + size > max_total_bytes:
+            file_hashes.append(relative + "\x1fskipped-size=" + str(exc.size))
+            if remaining_total <= max_file_bytes:
                 skip_counts["total_byte_limit"] += 1
                 limitations.append(
                     "Total byte limit reached; remaining files were not scanned."
@@ -2340,8 +2306,15 @@ def profile_repository(
                 break
             skip_counts["file_size_limit"] += 1
             continue
-        try:
-            raw = path.read_bytes()
+        except safe_io.UnsafeFileError:
+            files_skipped += 1
+            partial = True
+            skip_counts["unsafe_file"] += 1
+            file_hashes.append(relative + "\x1funsafe-file")
+            limitations.append(
+                "At least one file changed identity or contents during evaluation and was rejected."
+            )
+            continue
         except OSError:
             files_skipped += 1
             partial = True
@@ -2379,8 +2352,19 @@ def profile_repository(
         file_hashes.append(relative + "\x1f" + content_hash)
         files_scanned += 1
         bytes_scanned += len(raw)
-        observations.extend(inspect_package_json(relative, evidence_text, scope))
-        observations.extend(inspect_python_manifest(relative, evidence_text, scope))
+        observations.extend(
+            inspect_package_json(relative, evidence_text, scope, path_privacy)
+        )
+        try:
+            observations.extend(
+                inspect_python_manifest(relative, evidence_text, scope, path_privacy)
+            )
+        except (tomllib.TOMLDecodeError, TypeError, RecursionError):
+            partial = True
+            skip_counts["invalid_manifest"] += 1
+            limitations.append(
+                "At least one production Python TOML manifest could not be parsed; dependency evidence may be incomplete."
+            )
         if Path(relative).name == "package.json":
             try:
                 manifest = strict_json_loads(evidence_text)
@@ -2392,7 +2376,10 @@ def profile_repository(
                 limitations.append(
                     "At least one production package.json could not be parsed; dependency evidence may be incomplete."
                 )
-        observations.extend(inspect_text(relative, evidence_text, scope))
+        if Path(relative).name not in MANIFEST_NAMES:
+            observations.extend(
+                inspect_text(relative, evidence_text, scope, path_privacy)
+            )
 
     if walk_stats.entry_limit_reached:
         partial = True
@@ -2459,7 +2446,7 @@ def profile_repository(
     return {
         "schema_version": SCHEMA_VERSION,
         "subject": {
-            "repository": redact_path(root.name),
+            "repository": redact_path(root.name, path_privacy),
             "subject_revision": subject_revision,
             "source_inventory_digest": source_inventory_digest,
             "decision_model_digest": DECISION_MODEL_DIGEST,
@@ -2665,6 +2652,12 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser.add_argument("--max-files", type=int, default=DEFAULT_MAX_FILES)
     parser.add_argument("--max-file-bytes", type=int, default=DEFAULT_MAX_FILE_BYTES)
     parser.add_argument("--max-total-bytes", type=int, default=DEFAULT_MAX_TOTAL_BYTES)
+    parser.add_argument(
+        "--path-privacy",
+        choices=PATH_PRIVACY_MODES,
+        default="heuristic",
+        help="How repository-relative paths appear in artifacts.",
+    )
     return parser.parse_args(argv)
 
 
@@ -2676,10 +2669,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     try:
         profile = profile_repository(
             Path(args.repo),
-            Path(args.context).resolve(strict=True) if args.context else None,
+            Path(args.context).absolute() if args.context else None,
             args.max_files,
             args.max_file_bytes,
             args.max_total_bytes,
+            args.path_privacy,
         )
         rendered = (
             json.dumps(profile, indent=2, sort_keys=True, ensure_ascii=False) + "\n"

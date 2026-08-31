@@ -10,6 +10,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import time
 from contextlib import contextmanager
 from pathlib import Path, PurePosixPath
 from typing import Any, Dict, Iterator, Mapping, Optional, Sequence, Tuple
@@ -29,7 +30,127 @@ DEFAULT_MANIFEST = REPOSITORY_ROOT / "benchmarks" / "scenarios.json"
 DEFAULT_PROFILE_MANIFEST = REPOSITORY_ROOT / "benchmarks" / "profile-cases.json"
 DEFAULT_MUTATION_MANIFEST = REPOSITORY_ROOT / "benchmarks" / "mutations.json"
 DEFAULT_REAL_REPO_MANIFEST = REPOSITORY_ROOT / "benchmarks" / "real-repos.json"
+DEFAULT_ADVERSARIAL_MANIFEST = (
+    REPOSITORY_ROOT / "benchmarks" / "adversarial-performance" / "cases.json"
+)
 BENCHMARK_VERSION = "0.3.0"
+ADVERSARIAL_SENTINEL = "CONTEXTSEC_PERF_SECRET_DO_NOT_EMIT_7d91"
+
+
+def _fit_input(prefix: str, unit: str, suffix: str, size: int) -> str:
+    if size < len(prefix) + len(suffix) or not unit:
+        raise ValueError("Adversarial recipe has an invalid byte target.")
+    repetitions = (size - len(prefix) - len(suffix)) // len(unit) + 1
+    return (prefix + unit * repetitions + suffix)[:size]
+
+
+def _adversarial_source(recipe: str, size: int) -> str:
+    if recipe == "unterminated-js-string":
+        return _fit_input('const value = "' + ADVERSARIAL_SENTINEL, "a", "", size)
+    if recipe == "template-expressions":
+        return _fit_input(
+            "const value = `" + ADVERSARIAL_SENTINEL,
+            "${lookup(value ?? `${fallback}`)}",
+            "`;",
+            size,
+        )
+    if recipe == "sql-boundaries":
+        return _fit_input(
+            "SELECT 1; # " + ADVERSARIAL_SENTINEL + "\n",
+            "SELECT payload #- '{a}' -- comment\n/* near */ SELECT 2- -1;\n",
+            "",
+            size,
+        )
+    if recipe == "python-fstrings":
+        return _fit_input(
+            'seed = f"' + ADVERSARIAL_SENTINEL + ' {value!r:>{width}}"\n',
+            'item = rf"literal {{brace}} {value!s:>{width}}"\n',
+            "",
+            size,
+        )
+    if recipe == "near-match-decoys":
+        return _fit_input(
+            "// " + ADVERSARIAL_SENTINEL + "\n",
+            "openaiish.paymentIntentionally.retrievee organizationIdentifier secretiveToken;\n",
+            "",
+            size,
+        )
+    if recipe == "malformed-toml":
+        return _fit_input(
+            '[project]\nname = "case"\ndependencies = ["' + ADVERSARIAL_SENTINEL,
+            "x",
+            "",
+            size,
+        )
+    raise ValueError("Unknown adversarial recipe: " + recipe)
+
+
+def run_adversarial_performance(
+    manifest_path: Path = DEFAULT_ADVERSARIAL_MANIFEST,
+) -> Dict[str, Any]:
+    manifest = profile_repo.strict_json_loads(manifest_path.read_text(encoding="utf-8"))
+    cases = manifest.get("cases") if isinstance(manifest, dict) else None
+    ceiling = manifest.get("max_seconds_per_case") if isinstance(manifest, dict) else None
+    if (
+        not isinstance(cases, list)
+        or not cases
+        or not isinstance(ceiling, (int, float))
+        or ceiling <= 0
+    ):
+        raise ValueError("Adversarial manifest is invalid.")
+    results = []
+    for case in cases:
+        if not isinstance(case, dict) or set(case) != {
+            "id",
+            "recipe",
+            "path",
+            "bytes",
+            "expected_coverage",
+        }:
+            raise ValueError("Adversarial case shape is invalid.")
+        size = case["bytes"]
+        if not isinstance(size, int) or size < 1 or size > profile_repo.DEFAULT_MAX_FILE_BYTES:
+            raise ValueError("Adversarial case exceeds the published file bound.")
+        source = _adversarial_source(str(case["recipe"]), size)
+        language = profile_repo.language_for_path(str(case["path"]))
+        started = time.perf_counter()
+        masked = profile_repo.mask_comments_and_strings(source, language=language)
+        with materialized_case(str(case["id"]), {str(case["path"]): source}) as root:
+            profile = profile_repo.profile_repository(root)
+            checks = check_controls.check_repository(root, profile=profile)
+        elapsed = time.perf_counter() - started
+        serialized = json.dumps(
+            {"profile": profile, "checks": checks},
+            sort_keys=True,
+            ensure_ascii=False,
+        )
+        properties = {
+            "within_time_bound": elapsed <= float(ceiling),
+            "mask_preserves_length": len(masked) == len(source),
+            "mask_does_not_disclose_seed": ADVERSARIAL_SENTINEL not in masked,
+            "artifacts_do_not_disclose_seed": ADVERSARIAL_SENTINEL not in serialized,
+            "coverage_fails_closed": profile["coverage"]["status"]
+            == case["expected_coverage"],
+        }
+        results.append(
+            {
+                "id": case["id"],
+                "bytes": len(source.encode("utf-8")),
+                "elapsed_seconds": round(elapsed, 6),
+                "status": "pass" if all(properties.values()) else "fail",
+                "properties": properties,
+            }
+        )
+    return {
+        "schema_version": BENCHMARK_VERSION,
+        "suite": "adversarial_performance",
+        "manifest_version": manifest.get("version"),
+        "status": "pass" if all(item["status"] == "pass" for item in results) else "fail",
+        "max_seconds_per_case": ceiling,
+        "case_count": len(results),
+        "results": results,
+        "method": manifest.get("method"),
+    }
 
 
 def ratio(numerator: int, denominator: int) -> float:
@@ -728,7 +849,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     parser = argparse.ArgumentParser(description="Run ContextSec decision benchmarks.")
     parser.add_argument(
         "--suite",
-        choices=("regression", "profile", "mutation", "real-repo", "all"),
+        choices=("regression", "profile", "mutation", "real-repo", "adversarial", "all"),
         default="regression",
     )
     parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
@@ -740,6 +861,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     )
     parser.add_argument(
         "--real-repo-manifest", type=Path, default=DEFAULT_REAL_REPO_MANIFEST
+    )
+    parser.add_argument(
+        "--adversarial-manifest", type=Path, default=DEFAULT_ADVERSARIAL_MANIFEST
     )
     parser.add_argument("--workspace", type=Path)
     args = parser.parse_args(argv)
@@ -754,6 +878,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             if args.workspace is None:
                 raise ValueError("--workspace is required for the real-repo suite.")
             result = run_real_repositories(args.workspace, args.real_repo_manifest)
+        elif args.suite == "adversarial":
+            result = run_adversarial_performance(args.adversarial_manifest)
         else:
             suites = {
                 "regression": run_benchmark(args.manifest),

@@ -89,6 +89,28 @@ Release gate:
 
 The evaluation split is frozen but not independently labeled. v0.3 therefore remains a research preview and does not claim ecosystem accuracy.
 
+## v0.3.1 - Boundary and provenance hardening
+
+Delivered scope:
+
+- descriptor-based race-resistant repository reads with explicit unsafe-file coverage;
+- Python 3.11 `tomllib` parsing for PEP 621, Poetry, and Pipfile production dependencies;
+- heuristic, hashed, and opaque artifact path privacy;
+- machine-readable support matrix plus `--version` and `doctor` diagnostics;
+- adversarial 500 KiB performance/non-disclosure cases and an optimized f-string lexical path;
+- hash-pinned Agent Skills validator dependency closure;
+- byte-identical release, SHA256SUMS, artifact attestation, and draft-then-publish automation;
+- independently reviewable external-label protocol with raw agreement and Cohen's κ;
+- Contributor Covenant-based conduct policy and citation metadata.
+
+Release gate:
+
+- every blocking self-routed CI control has subject-bound policy evidence;
+- self-profile covers both the repository surface and the core skill directory;
+- the adversarial suite passes its generous supported-runner ceiling and non-disclosure properties;
+- release archives are byte-identical and every external Action is owner-allowlisted and commit-pinned;
+- future release assets are protected by repository release immutability.
+
 ## v0.4 - Ecosystem proof
 
 - externally labeled repositories from a declared sampling frame, with reviewer disagreements retained;

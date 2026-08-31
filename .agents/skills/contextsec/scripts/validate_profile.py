@@ -52,7 +52,9 @@ def validate(profile: Mapping[str, Any]) -> List[str]:
         errors,
     )
     require(
-        profile.get("schema_version") == "0.3.0", "unsupported schema_version", errors
+        profile.get("schema_version") == profile_repo.SCHEMA_VERSION,
+        "unsupported schema_version",
+        errors,
     )
 
     subject = profile.get("subject")
@@ -112,6 +114,30 @@ def validate(profile: Mapping[str, Any]) -> List[str]:
             "coverage.status must be complete or partial",
             errors,
         )
+        skip_counts = coverage.get("skip_counts")
+        require(isinstance(skip_counts, dict), "coverage.skip_counts must be an object", errors)
+        if isinstance(skip_counts, dict):
+            exact_keys(
+                skip_counts,
+                {
+                    "non_production_scope",
+                    "file_size_limit",
+                    "total_byte_limit",
+                    "stat_error",
+                    "read_error",
+                    "unsafe_file",
+                    "binary",
+                    "invalid_encoding",
+                    "invalid_manifest",
+                },
+                "coverage.skip_counts",
+                errors,
+            )
+            require(
+                all(type(value) is int and value >= 0 for value in skip_counts.values()),
+                "coverage.skip_counts values must be non-negative integers",
+                errors,
+            )
         require(
             coverage.get("language_support")
             in {"supported", "partial", "unsupported"},
