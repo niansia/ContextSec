@@ -43,9 +43,9 @@ generate / review / test
 Control Ledger + evidence + release gate
 ```
 
-**Status:** research preview `v0.3.2`. Local-first, read-only profiling, no source upload, no target-code execution, and no third-party runtime dependency.
+**Status:** research preview `v0.3.3`. Local-first, read-only profiling, no source upload, no target-code execution, and no third-party runtime dependency.
 
-**Versioning:** Release/tool versions and artifact schema versions are independent and each has one canonical file. v0.3.2 advances artifact schemas to `0.3.2` for explicit path-privacy metadata, full evidence identities, evidence-correlation semantics, and separately bound routing, detector, checker, catalog, composition, and support models.
+**Versioning:** Release/tool versions and artifact schema versions are independent and each has one canonical file. v0.3.3 keeps artifact schemas at `0.3.2`; it is a release-verifier compatibility hotfix on top of the v0.3.2 evidence-identity model.
 
 ## The decision pipeline
 
@@ -331,7 +331,8 @@ python .agents/skills/contextsec/scripts/contextsec.py explain secrets-managemen
 1. **v0.2.1 — applicability correctness:** language-aware lexical policy, one-profile subject binding, per-control applicability, flow-aware compositions, catalog validation, and cross-platform release metadata.
 2. **v0.3.1 — boundary and provenance hardening:** race-resistant reads, stdlib TOML, explicit path privacy, adversarial performance bounds, machine-readable support, hash-pinned validator dependencies, and attested immutable release automation.
 3. **v0.3.2 — evidence identity hardening:** root-anchored reads, full canonical identities, correlation-aware confidence, complete reusable release proof, conservative CI evidence, bounded artifact readers, and holdout evaluation tooling.
-4. **v0.4 — independent ecosystem proof:** collect qualified external labels, add component-scoped monorepos and Profile Diff, bind signed verification evidence, and run comparative multi-agent evaluation.
+4. **v0.3.3 — release verifier compatibility:** checksum-pin a current GitHub CLI, verify release predicate v0.2, and tolerate bounded platform attestation availability delay while remaining fail-closed.
+5. **v0.4 — independent ecosystem proof:** collect qualified external labels, add component-scoped monorepos and Profile Diff, bind signed verification evidence, and run comparative multi-agent evaluation.
 
 Read [architecture](docs/architecture.md), [competitive positioning](docs/competitive-positioning.md), [v0.2.1 review resolution](docs/review-resolution-v0.2.1.md), and [release roadmap](docs/roadmap.md) before proposing a large feature.
 

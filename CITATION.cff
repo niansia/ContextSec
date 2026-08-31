@@ -5,7 +5,7 @@ title: "ContextSec"
 abstract: "A deterministic product-security applicability and evidence layer for AI coding agents."
 authors:
   - family-names: "niansia"
-version: 0.3.2
+version: 0.3.3
 date-released: 2026-08-31
 license: Apache-2.0
 repository-code: "https://github.com/niansia/ContextSec"

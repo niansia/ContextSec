@@ -133,6 +133,21 @@ Release gate:
 - every non-local Action is both commit-pinned and exactly allowlisted;
 - the tag commit must be an ancestor of `main` before build or publication.
 
+## v0.3.3 - Release attestation verifier compatibility
+
+Delivered scope:
+
+- checksum-pinned GitHub CLI 2.98.0 for immutable-release predicate v0.2 verification;
+- a bounded ten-minute wait for GitHub's asynchronously available release attestation;
+- fail-closed release completion if the attestation never verifies;
+- artifact schemas remain at 0.3.2 because their semantics did not change.
+
+Release gate:
+
+- the verifier archive must match its fixed SHA-256 before extraction;
+- the pinned verifier version must be active before any release mutation;
+- release, tag, commit, and asset digests must verify against the GitHub-issued release attestation.
+
 ## v0.4 - Ecosystem proof
 
 - externally labeled repositories from a declared sampling frame, with reviewer disagreements retained;
