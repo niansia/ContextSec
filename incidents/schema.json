@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/niansia/ContextSec/v0.3.1/incidents/schema.json",
+  "$id": "https://raw.githubusercontent.com/niansia/ContextSec/v0.3.2/incidents/schema.json",
   "title": "ContextSec incident-to-control map",
   "type": "object",
   "required": ["schema_version", "id", "event_date", "title", "investigation_status", "sources", "confirmed_facts", "inferences", "failure_patterns", "trust_boundaries", "contexts", "controls", "control_hypotheses", "regression"],

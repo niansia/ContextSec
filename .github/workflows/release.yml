@@ -9,30 +9,40 @@ permissions:
   contents: read
 
 jobs:
+  proof:
+    name: full security proof
+    uses: ./.github/workflows/security-proof.yml
+    permissions:
+      contents: read
+
   release:
+    name: build, verify, and publish
+    needs: proof
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     permissions:
       contents: write
       id-token: write
       attestations: write
     steps:
-      - name: Check out tagged source
+      - name: Check out tagged source and full lineage
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          fetch-depth: 0
           persist-credentials: false
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.14"
-      - name: Verify release identity and complete test suite
+      - name: Verify tag identity and main ancestry
         shell: bash
         run: |
           version="$(tr -d '\r\n' < .agents/skills/contextsec/VERSION)"
           test "$GITHUB_REF_NAME" = "v$version"
-          python -m unittest discover -s tests -v
-          python .agents/skills/contextsec/scripts/contextsec.py benchmark --suite all
-          python .agents/skills/contextsec/scripts/contextsec.py benchmark --suite adversarial
+          [[ "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          git fetch --no-tags origin "+refs/heads/main:refs/remotes/origin/main"
+          tag_commit="$(git rev-parse "$GITHUB_REF_NAME^{commit}")"
+          git merge-base --is-ancestor "$tag_commit" refs/remotes/origin/main
       - name: Build byte-identical release archives and checksums
         shell: bash
         run: |
@@ -45,23 +55,56 @@ jobs:
           rm "dist/contextsec-v$version-second.zip"
           cd dist
           sha256sum "contextsec-v$version.zip" > SHA256SUMS
+          sha256sum --check SHA256SUMS
       - name: Attest release archive and checksum manifest
         uses: actions/attest-build-provenance@43d14bc2b83dec42d39ecae14e916627a18bb661 # v3
         with:
           subject-path: |
             dist/contextsec-v*.zip
             dist/SHA256SUMS
-      - name: Publish draft after every asset is attached
+      - name: Verify local artifact attestations
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           version="$(tr -d '\r\n' < .agents/skills/contextsec/VERSION)"
+          gh attestation verify "dist/contextsec-v$version.zip" --repo "$GITHUB_REPOSITORY"
+          gh attestation verify dist/SHA256SUMS --repo "$GITHUB_REPOSITORY"
+      - name: Create immutable release candidate draft
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="$(tr -d '\r\n' < .agents/skills/contextsec/VERSION)"
+          release_notes="$(<.github/release-notes-preamble.md)"
           gh release create "$GITHUB_REF_NAME" \
             "dist/contextsec-v$version.zip" \
             "dist/SHA256SUMS" \
             --verify-tag \
             --draft \
             --generate-notes \
+            --notes "$release_notes" \
             --title "ContextSec v$version"
-          gh release edit "$GITHUB_REF_NAME" --draft=false
+      - name: Re-download and verify the exact draft assets
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="$(tr -d '\r\n' < .agents/skills/contextsec/VERSION)"
+          verification_dir="$(mktemp -d)"
+          gh release download "$GITHUB_REF_NAME" --dir "$verification_dir"
+          cd "$verification_dir"
+          sha256sum --check SHA256SUMS
+          cmp "contextsec-v$version.zip" "$GITHUB_WORKSPACE/dist/contextsec-v$version.zip"
+          gh attestation verify "contextsec-v$version.zip" --repo "$GITHUB_REPOSITORY"
+          gh attestation verify SHA256SUMS --repo "$GITHUB_REPOSITORY"
+      - name: Publish only after draft asset verification succeeds
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release edit "$GITHUB_REF_NAME" --draft=false
+      - name: Verify the immutable published release attestation
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release verify "$GITHUB_REF_NAME"

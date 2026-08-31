@@ -12,11 +12,18 @@ from pathlib import Path
 from typing import Any, List, Mapping, Optional, Sequence, Set
 
 import versioning
+import safe_io
+import profile_repo
 
 REFERENCE_DIR = Path(__file__).resolve().parents[1] / "references"
-CATALOG = json.loads((REFERENCE_DIR / "catalog.json").read_text(encoding="utf-8"))
+CATALOG = safe_io.read_json_object_bounded(
+    REFERENCE_DIR / "catalog.json", 4 * 1024 * 1024, "Pack catalog"
+)
 PACKS = {item["id"] for item in CATALOG["packs"]}
 CHECKER_VERSION = versioning.TOOL_VERSION
+CHECKER_MODEL_DIGEST = "sha256:" + hashlib.sha256(
+    safe_io.read_regular_file(Path(__file__).with_name("check_controls.py"), 4 * 1024 * 1024)
+).hexdigest()
 
 
 def digest(material: str) -> str:
@@ -34,8 +41,10 @@ def known_controls() -> Set[str]:
         for pack in CATALOG["packs"]
         for control in pack["controls"]
     }
-    compositions = json.loads(
-        (REFERENCE_DIR / "compositions" / "catalog.json").read_text(encoding="utf-8")
+    compositions = safe_io.read_json_object_bounded(
+        REFERENCE_DIR / "compositions" / "catalog.json",
+        4 * 1024 * 1024,
+        "Composition catalog",
     )
     controls.update(rule["id"] for rule in compositions["rules"])
     return controls
@@ -45,12 +54,15 @@ def validate(payload: Mapping[str, Any]) -> List[str]:
     errors: List[str] = []
     exact_keys(
         payload,
-        {"schema_version", "subject", "active_packs", "findings", "finding_summary", "limitations"},
+        {"schema_version", "artifact_options", "subject", "active_packs", "findings", "finding_summary", "limitations"},
         "checks",
         errors,
     )
     if payload.get("schema_version") != versioning.SCHEMA_VERSION:
         errors.append("unsupported schema_version")
+    artifact_options = payload.get("artifact_options")
+    if not isinstance(artifact_options, dict) or set(artifact_options) != {"path_privacy"} or artifact_options.get("path_privacy") not in {"heuristic", "hashed", "opaque"}:
+        errors.append("artifact_options.path_privacy is invalid")
     active = payload.get("active_packs")
     if (
         not isinstance(active, list)
@@ -122,6 +134,7 @@ def validate(payload: Mapping[str, Any]) -> List[str]:
         evidence = item.get("evidence")
         evidence_fields = {
             "path",
+            "path_identity",
             "locator",
             "evidence_id",
             "location_id",
@@ -138,6 +151,7 @@ def validate(payload: Mapping[str, Any]) -> List[str]:
             or any(
                 not re.fullmatch(r"sha256:[a-f0-9]{64}", str(evidence.get(field, "")))
                 for field in (
+                    "path_identity",
                     "evidence_id",
                     "location_id",
                     "content_digest",
@@ -155,15 +169,15 @@ def validate(payload: Mapping[str, Any]) -> List[str]:
         if isinstance(evidence, dict):
             exact_keys(evidence, evidence_fields, f"findings[{index}].evidence", errors)
             if isinstance(checker, dict):
-                path = str(evidence.get("path", ""))
+                path_identity = str(evidence.get("path_identity", ""))
                 locator = str(evidence.get("locator", ""))
                 checker_id = str(checker.get("id", ""))
                 evidence_id = digest(
                     "\x1f".join(
-                        ("evidence", path, locator, checker_id, CHECKER_VERSION)
+                        ("evidence", path_identity, locator, checker_id, CHECKER_MODEL_DIGEST)
                     )
                 )
-                location_id = digest("\x1f".join(("location", path, locator)))
+                location_id = digest("\x1f".join(("location", path_identity, locator)))
                 fingerprint = digest(
                     "\x1f".join(
                         (
@@ -179,9 +193,7 @@ def validate(payload: Mapping[str, Any]) -> List[str]:
                     errors.append(f"findings[{index}] location_id is inconsistent")
                 if evidence.get("fingerprint") != fingerprint:
                     errors.append(f"findings[{index}] fingerprint is inconsistent")
-                suffix = hashlib.sha256(
-                    (path + "\x1f" + locator).encode("utf-8")
-                ).hexdigest()[:8]
+                suffix = location_id.removeprefix("sha256:")
                 if item.get("id") != "finding-" + checker_id.lower() + "-" + suffix:
                     errors.append(f"findings[{index}] id is inconsistent")
     if len(ids) != len(set(ids)):
@@ -202,7 +214,7 @@ def validate(payload: Mapping[str, Any]) -> List[str]:
     else:
         exact_keys(
             subject,
-            {"repository", "subject_revision", "source_inventory_digest", "decision_model_digest", "checker_version", "profile_coverage", "profile_language_support", "checker_coverage", "checker_input_hash"},
+            {"repository", "subject_revision", "source_inventory_digest", "decision_model_digest", "routing_model_digest", "detector_model_digest", "checker_model_digest", "catalog_digest", "composition_digest", "support_matrix_digest", "checker_version", "profile_coverage", "profile_language_support", "checker_coverage", "checker_input_hash"},
             "subject",
             errors,
         )
@@ -253,6 +265,18 @@ def validate(payload: Mapping[str, Any]) -> List[str]:
             str(subject.get("decision_model_digest", "")),
         ):
             errors.append("subject.decision_model_digest must be a SHA-256 identifier")
+        expected_digests = {
+            "decision_model_digest": profile_repo.DECISION_MODEL_DIGEST,
+            "routing_model_digest": profile_repo.ROUTING_MODEL_DIGEST,
+            "detector_model_digest": profile_repo.DETECTOR_MODEL_DIGEST,
+            "checker_model_digest": CHECKER_MODEL_DIGEST,
+            "catalog_digest": profile_repo.CATALOG_DIGEST,
+            "composition_digest": profile_repo.COMPOSITION_DIGEST,
+            "support_matrix_digest": profile_repo.SUPPORT_MATRIX_DIGEST,
+        }
+        for field, expected_digest in expected_digests.items():
+            if subject.get(field) != expected_digest:
+                errors.append("subject." + field + " does not match the active model")
         if not re.fullmatch(
             r"sha256:[a-f0-9]{64}",
             str(subject.get("source_inventory_digest", "")),
@@ -279,12 +303,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     parser.add_argument("checks", type=Path)
     args = parser.parse_args(argv)
     try:
-        payload = json.loads(args.checks.read_text(encoding="utf-8"))
+        payload = safe_io.read_json_object_bounded(
+            args.checks, 64 * 1024 * 1024, "Control checks"
+        )
     except (OSError, ValueError, RecursionError) as exc:
         print("error: unable to read checks: " + str(exc), file=sys.stderr)
-        return 2
-    if not isinstance(payload, dict):
-        print("error: checks root must be an object", file=sys.stderr)
         return 2
     errors = validate(payload)
     if errors:

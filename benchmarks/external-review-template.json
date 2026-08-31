@@ -1,12 +1,13 @@
 {
-  "version": "0.4-protocol-1",
+  "$schema": "https://raw.githubusercontent.com/niansia/ContextSec/v0.3.2/benchmarks/external-review.schema.json",
+  "version": "0.4-protocol-2",
   "status": "template",
   "sampling_frame": {
     "population": "Define the repository population before selecting cases.",
     "selection_method": "Define the deterministic or randomized selection procedure.",
     "inclusion_criteria": ["Replace with pre-declared inclusion criteria."],
     "exclusion_criteria": ["Replace with pre-declared exclusion criteria."],
-    "freeze_date": "YYYY-MM-DD"
+    "freeze_date": "0000-01-01"
   },
   "review_policy": {
     "detector_implementers_excluded": true,

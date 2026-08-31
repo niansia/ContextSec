@@ -12,11 +12,16 @@ from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence
 
 import versioning
+import safe_io
 
 REFERENCE_DIR = Path(__file__).resolve().parents[1] / "references"
-CATALOG = json.loads((REFERENCE_DIR / "catalog.json").read_text(encoding="utf-8"))
-COMPOSITIONS = json.loads(
-    (REFERENCE_DIR / "compositions" / "catalog.json").read_text(encoding="utf-8")
+CATALOG = safe_io.read_json_object_bounded(
+    REFERENCE_DIR / "catalog.json", 4 * 1024 * 1024, "Pack catalog"
+)
+COMPOSITIONS = safe_io.read_json_object_bounded(
+    REFERENCE_DIR / "compositions" / "catalog.json",
+    4 * 1024 * 1024,
+    "Composition catalog",
 )
 VERSION = versioning.SCHEMA_VERSION
 APPLICABILITY = {"required", "candidate", "not_applicable", "unknown"}
@@ -33,7 +38,7 @@ def validate(payload: Mapping[str, Any], as_of: Optional[date] = None) -> List[s
 
     exact(
         payload,
-        {"schema_version", "evaluation_date", "subject", "active_compositions", "ledger", "summary", "gate", "limitations"},
+        {"schema_version", "evaluation_date", "artifact_options", "subject", "active_compositions", "ledger", "summary", "gate", "limitations"},
         "ledger root",
     )
     if payload.get("schema_version") != VERSION:
@@ -47,6 +52,13 @@ def validate(payload: Mapping[str, Any], as_of: Optional[date] = None) -> List[s
             errors.append("evaluation_date is invalid")
     if as_of is not None and evaluation_date != as_of:
         errors.append("evaluation_date does not match the expected release date")
+    artifact_options = payload.get("artifact_options")
+    if (
+        not isinstance(artifact_options, dict)
+        or set(artifact_options) != {"path_privacy"}
+        or artifact_options.get("path_privacy") not in {"heuristic", "hashed", "opaque"}
+    ):
+        errors.append("artifact_options.path_privacy is invalid")
     controls: Dict[str, Dict[str, Any]] = {
         control["id"]: {**control, "source_type": "pack", "source_id": pack["id"]}
         for pack in CATALOG["packs"]
@@ -64,10 +76,20 @@ def validate(payload: Mapping[str, Any], as_of: Optional[date] = None) -> List[s
     else:
         exact(
             subject,
-            {"repository", "subject_revision", "source_inventory_digest", "decision_model_digest", "profile_coverage", "profile_language_support", "checker_coverage"},
+            {"repository", "subject_revision", "source_inventory_digest", "decision_model_digest", "routing_model_digest", "detector_model_digest", "catalog_digest", "composition_digest", "support_matrix_digest", "checker_model_digest", "profile_coverage", "profile_language_support", "checker_coverage"},
             "subject",
         )
-        for field in ("subject_revision", "source_inventory_digest", "decision_model_digest"):
+        for field in (
+            "subject_revision",
+            "source_inventory_digest",
+            "decision_model_digest",
+            "routing_model_digest",
+            "detector_model_digest",
+            "catalog_digest",
+            "composition_digest",
+            "support_matrix_digest",
+            "checker_model_digest",
+        ):
             if not re.fullmatch(r"sha256:[a-f0-9]{64}", str(subject.get(field, ""))):
                 errors.append("subject." + field + " is invalid")
         if subject.get("profile_coverage") not in {"complete", "partial"}:
@@ -358,12 +380,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     )
     args = parser.parse_args(argv)
     try:
-        payload = json.loads(args.ledger.read_text(encoding="utf-8"))
+        payload = safe_io.read_json_object_bounded(
+            args.ledger, 64 * 1024 * 1024, "Control ledger"
+        )
     except (OSError, ValueError, RecursionError) as exc:
         print("error: unable to read ledger: " + str(exc), file=sys.stderr)
-        return 2
-    if not isinstance(payload, dict):
-        print("error: ledger root must be an object", file=sys.stderr)
         return 2
     try:
         as_of = date.fromisoformat(args.as_of) if args.as_of else None

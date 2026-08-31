@@ -23,6 +23,9 @@ import support_matrix  # noqa: E402
 import versioning  # noqa: E402
 
 CHECKER_VERSION = versioning.TOOL_VERSION
+CHECKER_MODEL_DIGEST = "sha256:" + hashlib.sha256(
+    safe_io.read_regular_file(Path(__file__), 4 * 1024 * 1024)
+).hexdigest()
 
 CHECKER_SUPPORTED_SUFFIXES = support_matrix.values("checker", "supported_suffixes")
 CHECKER_UNSUPPORTED_SUFFIXES = support_matrix.values(
@@ -60,18 +63,20 @@ def location(
 ) -> Dict[str, str]:
     locator = "line:" + str(profile_repo.line_number(text, start))
     safe_path = profile_repo.redact_path(relative, path_privacy)
+    canonical_path = profile_repo.path_identity(relative)
     evidence_id = digest(
-        "\x1f".join(("evidence", safe_path, locator, checker_id, CHECKER_VERSION)).encode(
-            "utf-8"
-        )
+        "\x1f".join(
+            ("evidence", canonical_path, locator, checker_id, CHECKER_MODEL_DIGEST)
+        ).encode("utf-8")
     )
     content_digest = digest(raw)
     return {
         "path": safe_path,
+        "path_identity": canonical_path,
         "locator": locator,
         "evidence_id": evidence_id,
         "location_id": digest(
-            "\x1f".join(("location", safe_path, locator)).encode("utf-8")
+            "\x1f".join(("location", canonical_path, locator)).encode("utf-8")
         ),
         "content_digest": content_digest,
         "fingerprint": digest(
@@ -92,9 +97,7 @@ def finding(
     evidence: Mapping[str, str],
     method: str,
 ) -> Dict[str, Any]:
-    stable_suffix = hashlib.sha256(
-        (str(evidence["path"]) + "\x1f" + str(evidence["locator"])).encode("utf-8")
-    ).hexdigest()[:8]
+    stable_suffix = str(evidence["location_id"]).removeprefix("sha256:")
     return {
         "id": "finding-" + checker_id.lower() + "-" + stable_suffix,
         "checker": {"id": checker_id, "version": CHECKER_VERSION},
@@ -155,8 +158,8 @@ def load_sources(
             partial = True
             break
         try:
-            raw = safe_io.read_regular_file(
-                path, min(max_file_bytes, remaining_total)
+            raw = safe_io.read_regular_file_at(
+                root, relative_path, min(max_file_bytes, remaining_total)
             )
         except safe_io.FileSizeLimitError as exc:
             partial = True
@@ -918,14 +921,9 @@ def check_repository(
     if profile is None:
         profile = profile_repo.profile_repository(root, path_privacy=path_privacy)
     else:
-        matching_modes = [
-            mode
-            for mode in profile_repo.PATH_PRIVACY_MODES
-            if profile.get("subject", {}).get("repository")
-            == profile_repo.redact_path(root.name, mode)
-        ]
-        if matching_modes:
-            path_privacy = matching_modes[0]
+        path_privacy = str(
+            profile.get("artifact_options", {}).get("path_privacy", path_privacy)
+        )
     if profile.get("schema_version") != profile_repo.SCHEMA_VERSION:
         raise ValueError("Profile schema_version does not match this checker.")
     if profile.get("subject", {}).get("repository") != profile_repo.redact_path(
@@ -980,10 +978,17 @@ def check_repository(
         )
     return {
         "schema_version": profile_repo.SCHEMA_VERSION,
+        "artifact_options": {"path_privacy": path_privacy},
         "subject": {
             "repository": profile["subject"]["repository"],
             "subject_revision": profile["subject"]["subject_revision"],
             "decision_model_digest": profile["subject"]["decision_model_digest"],
+            "routing_model_digest": profile["subject"]["routing_model_digest"],
+            "detector_model_digest": profile["subject"]["detector_model_digest"],
+            "checker_model_digest": CHECKER_MODEL_DIGEST,
+            "catalog_digest": profile["subject"]["catalog_digest"],
+            "composition_digest": profile["subject"]["composition_digest"],
+            "support_matrix_digest": profile["subject"]["support_matrix_digest"],
             "source_inventory_digest": checker_coverage["source_inventory_digest"],
             "checker_version": CHECKER_VERSION,
             "profile_coverage": profile["coverage"]["status"],

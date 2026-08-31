@@ -22,12 +22,20 @@ import versioning  # noqa: E402
 
 ACTION = re.compile(r"(?m)^\s*-?\s*uses\s*:\s*[\"']?(?P<value>[^\s\"'#]+)")
 IMMUTABLE_ACTION = re.compile(
-    r"^(?P<owner>[A-Za-z0-9_.-]+)/[^@]+@[a-f0-9]{40}(?:[a-f0-9]{24})?$",
+    r"^(?P<action>[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)@[a-f0-9]{40}(?:[a-f0-9]{24})?$",
     re.IGNORECASE,
 )
 UNTRUSTED_EXPRESSION = re.compile(
     r"\$\{\{\s*"
-    r"(?:github\.(?!sha\b|repository\b|ref_name\b)|inputs\.|env\.|matrix\.)"
+    r"(?:github\.(?!sha\b|repository\b)|inputs\.|env\.|matrix\.)"
+)
+DYNAMIC_SHELL_CODE = re.compile(
+    r"(?im)(?:^|[;&|]\s*)"
+    r"(?:eval\b|iex\b|invoke-expression\b|(?:ba|z|k)?sh\s+-c\b|"
+    r"(?:pwsh|powershell)(?:\.exe)?\s+-(?:command|encodedcommand)\b)"
+)
+ENV_ASSIGNMENT = re.compile(
+    r"(?m)^[ \t]*(?P<name>[A-Za-z_][A-Za-z0-9_]*)[ \t]*:[ \t]*(?P<value>[^\n]+?)[ \t]*$"
 )
 
 
@@ -62,12 +70,24 @@ def _run_blocks(text: str) -> list[str]:
 
 
 def _load_json(path: Path) -> Dict[str, Any]:
-    payload = profile_repo.strict_json_loads(
-        safe_io.read_regular_file(path, 256 * 1024).decode("utf-8-sig")
+    return safe_io.read_json_object_bounded(path, 256 * 1024, "CI policy")
+
+
+def _tainted_environment(text: str) -> set[str]:
+    return {
+        match.group("name")
+        for match in ENV_ASSIGNMENT.finditer(text)
+        if UNTRUSTED_EXPRESSION.search(match.group("value"))
+    }
+
+
+def _uses_environment(block: str, name: str) -> bool:
+    escaped = re.escape(name)
+    return bool(
+        re.search(r"\$" + escaped + r"\b|\$\{" + escaped + r"\}", block)
+        or re.search(r"\$env:" + escaped + r"\b", block, re.IGNORECASE)
+        or re.search(r"%" + escaped + r"%", block, re.IGNORECASE)
     )
-    if not isinstance(payload, dict):
-        raise ValueError("JSON root must be an object.")
-    return payload
 
 
 def audit_repository(root: Path) -> Dict[str, Any]:
@@ -75,12 +95,18 @@ def audit_repository(root: Path) -> Dict[str, Any]:
     policy = _load_json(root / "ci" / "allowed-actions.json")
     if policy.get("schema_version") != versioning.SCHEMA_VERSION:
         raise ValueError("CI action policy schema version is incompatible.")
-    owners = policy.get("allowed_owners")
-    if not isinstance(owners, list) or not owners or not all(
-        isinstance(item, str) and item for item in owners
+    if set(policy) != {"schema_version", "allowed_actions", "policy"}:
+        raise ValueError("CI action policy has unexpected or missing fields.")
+    actions = policy.get("allowed_actions")
+    if not isinstance(actions, list) or not actions or not all(
+        isinstance(item, str)
+        and re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", item)
+        for item in actions
     ):
-        raise ValueError("CI action policy must list allowed owners.")
-    allowed = {item.lower() for item in owners}
+        raise ValueError("CI action policy must list exact action repositories.")
+    if len(actions) != len({item.lower() for item in actions}):
+        raise ValueError("CI action policy has duplicate actions.")
+    allowed = {item.lower() for item in actions}
     workflow_dir = root / ".github" / "workflows"
     workflows = sorted((*workflow_dir.glob("*.yml"), *workflow_dir.glob("*.yaml")))
     if not workflows:
@@ -90,7 +116,9 @@ def audit_repository(root: Path) -> Dict[str, Any]:
     action_count = 0
     pull_request_workflows = 0
     for path in workflows:
-        text = safe_io.read_regular_file(path, 512 * 1024).decode("utf-8")
+        text = safe_io.read_regular_file_at(
+            root, path.relative_to(root), 512 * 1024
+        ).decode("utf-8")
         label = path.relative_to(root).as_posix()
         permission_match = re.search(
             r"(?m)^permissions:\s*\n(?P<body>(?:  [A-Za-z0-9_-]+:\s*[A-Za-z-]+\s*\n?)+)",
@@ -101,8 +129,23 @@ def audit_repository(root: Path) -> Dict[str, Any]:
             or permission_match.group("body").strip() != "contents: read"
         ):
             issues.append(label + ": top-level permissions are not exactly contents: read")
-        if any(UNTRUSTED_EXPRESSION.search(block) for block in _run_blocks(text)):
+        run_blocks = _run_blocks(text)
+        tainted_environment = _tainted_environment(text)
+        if any(UNTRUSTED_EXPRESSION.search(block) for block in run_blocks):
             issues.append(label + ": untrusted event/input expression reaches a run block")
+        if any(DYNAMIC_SHELL_CODE.search(block) for block in run_blocks):
+            issues.append(label + ": dynamic shell-code execution is prohibited")
+        tainted_uses = sorted(
+            name
+            for name in tainted_environment
+            if any(_uses_environment(block, name) for block in run_blocks)
+        )
+        if tainted_uses:
+            issues.append(
+                label
+                + ": expression-tainted environment reaches a run block: "
+                + ", ".join(tainted_uses)
+            )
         if re.search(r"(?m)^\s*pull_request_target\s*:", text):
             issues.append(label + ": pull_request_target is prohibited")
         has_pull_request = bool(re.search(r"(?m)^\s*pull_request\s*:", text))
@@ -121,8 +164,8 @@ def audit_repository(root: Path) -> Dict[str, Any]:
             if immutable is None:
                 issues.append(label + ": mutable action reference " + value)
                 continue
-            if immutable.group("owner").lower() not in allowed:
-                issues.append(label + ": action owner is not allowlisted")
+            if immutable.group("action").lower() not in allowed:
+                issues.append(label + ": action is not exactly allowlisted")
             if value.lower().startswith("actions/checkout@"):
                 step_tail = text[match.end() : match.end() + 300]
                 if not re.search(r"(?m)^\s+persist-credentials:\s*false\s*$", step_tail):
@@ -130,7 +173,9 @@ def audit_repository(root: Path) -> Dict[str, Any]:
 
     release_path = workflow_dir / "release.yml"
     release = (
-        safe_io.read_regular_file(release_path, 512 * 1024).decode("utf-8")
+        safe_io.read_regular_file_at(
+            root, release_path.relative_to(root), 512 * 1024
+        ).decode("utf-8")
         if release_path.exists()
         else ""
     )
@@ -142,16 +187,38 @@ def audit_repository(root: Path) -> Dict[str, Any]:
         "SHA256SUMS",
         "cmp ",
         "attest-build-provenance",
+        "gh release verify",
     )
     missing_release = [item for item in release_markers if item not in release]
     if missing_release:
         issues.append(".github/workflows/release.yml: incomplete provenance workflow")
+    proof = safe_io.read_regular_file_at(
+        root, Path(".github/workflows/security-proof.yml"), 512 * 1024
+    ).decode("utf-8")
+    proof_markers = (
+        "workflow_call:",
+        "test:",
+        "evidence:",
+        "agent-skill-spec:",
+        "real-repositories:",
+        "needs: [test, evidence, agent-skill-spec, real-repositories]",
+    )
+    if any(item not in proof for item in proof_markers):
+        issues.append(".github/workflows/security-proof.yml: full proof contract is incomplete")
+    topology_markers = (
+        "uses: ./.github/workflows/security-proof.yml",
+        "needs: proof",
+        "git merge-base --is-ancestor",
+        "gh attestation verify",
+    )
+    if any(item not in release for item in topology_markers):
+        issues.append(".github/workflows/release.yml: release is not gated by the reusable full proof")
     if pull_request_workflows < 1:
         issues.append("no pull_request workflow exercises the untrusted contribution path")
     if action_count < 1:
         issues.append("no third-party Action references were audited")
-    requirements = safe_io.read_regular_file(
-        root / "ci" / "agent-skills-validator-requirements.txt", 256 * 1024
+    requirements = safe_io.read_regular_file_at(
+        root, Path("ci") / "agent-skills-validator-requirements.txt", 256 * 1024
     ).decode("utf-8")
     logical_requirements = requirements.replace("\\\n", " ").splitlines()
     for line in logical_requirements:
@@ -172,11 +239,11 @@ def audit_repository(root: Path) -> Dict[str, Any]:
         "pull_request_workflow_count": pull_request_workflows,
         "issues": issues,
         "evidence_refs": {
-            "action_policy": "ci-audit:immutable-actions-and-owner-allowlist",
+            "action_policy": "ci-audit:immutable-actions-and-exact-allowlist",
             "token_policy": "ci-audit:explicit-workflow-permissions",
             "pr_policy": "ci-audit:pull-request-secret-and-runner-isolation",
-            "injection_policy": "ci-audit:expression-to-shell-boundary",
-            "provenance_policy": "ci-audit:reproducible-attested-release-workflow",
+            "injection_policy": "ci-audit:expression-env-and-shell-code-boundary",
+            "provenance_policy": "ci-audit:configured-release-verification-boundary",
             "dependency_policy": "ci-audit:hash-pinned-validator-runtime",
         },
     }
@@ -189,12 +256,12 @@ def build_evidence(profile: Mapping[str, Any], audit: Mapping[str, Any]) -> Dict
         raise ValueError("CI audit failed; verified evidence cannot be emitted.")
     refs = audit["evidence_refs"]
     rows = (
-        ("CICD-ACTION-001", refs["action_policy"], "All external Action references are immutable and owner-allowlisted."),
-        ("CICD-TOKEN-001", refs["token_policy"], "Every workflow has an explicit read-only token baseline and elevated release permissions are job-local."),
-        ("CICD-PR-001", refs["pr_policy"], "Pull-request workflows expose neither secret references nor self-hosted runners and checkout credentials are not persisted."),
-        ("CICD-INJECT-001", refs["injection_policy"], "Repository-controlled event, input, environment, and matrix expressions do not enter run blocks."),
-        ("CICD-PROV-001", refs["provenance_policy"], "The release workflow rebuilds deterministically, publishes SHA256SUMS, and requests artifact provenance."),
-        ("FND-DEP-001", refs["dependency_policy"], "The Agent Skills validator source is commit-pinned and its complete Python build/runtime closure is hash-pinned."),
+        ("CICD-ACTION-001", "verified", refs["action_policy"], "All external Action references are immutable and exactly allowlisted."),
+        ("CICD-TOKEN-001", "verified", refs["token_policy"], "Every workflow has an explicit read-only token baseline and elevated release permissions are job-local."),
+        ("CICD-PR-001", "verified", refs["pr_policy"], "Pull-request workflows expose neither secret references nor self-hosted runners and checkout credentials are not persisted."),
+        ("CICD-INJECT-001", "verified", refs["injection_policy"], "Supported workflow shell flows contain no direct untrusted expressions, expression-tainted environment use, or dynamic shell-code execution sinks."),
+        ("CICD-PROV-001", "unknown", refs["provenance_policy"], "The workflow configures reproducible archives, checksums, attestations, and draft-asset re-verification; successful provenance for a particular release is established only by that release run."),
+        ("FND-DEP-001", "verified", refs["dependency_policy"], "The Agent Skills validator source is commit-pinned and its complete Python build/runtime closure is hash-pinned."),
     )
     return {
         "schema_version": versioning.SCHEMA_VERSION,
@@ -203,11 +270,11 @@ def build_evidence(profile: Mapping[str, Any], audit: Mapping[str, Any]) -> Dict
             {
                 "control_id": control_id,
                 "applicability": "required",
-                "verification": "verified",
+                "verification": verification,
                 "reason": reason,
                 "evidence_refs": [reference],
             }
-            for control_id, reference, reason in rows
+            for control_id, verification, reference, reason in rows
         ],
         "waivers": [],
     }

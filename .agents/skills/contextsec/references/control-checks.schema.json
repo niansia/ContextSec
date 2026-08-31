@@ -1,19 +1,31 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/niansia/ContextSec/v0.3.1/.agents/skills/contextsec/references/control-checks.schema.json",
+  "$id": "https://raw.githubusercontent.com/niansia/ContextSec/v0.3.2/.agents/skills/contextsec/references/control-checks.schema.json",
   "title": "ContextSec deterministic control checks",
   "type": "object",
-  "required": ["schema_version", "subject", "active_packs", "findings", "finding_summary", "limitations"],
+  "required": ["schema_version", "artifact_options", "subject", "active_packs", "findings", "finding_summary", "limitations"],
   "properties": {
-    "schema_version": {"const": "0.3.1"},
+    "schema_version": {"const": "0.3.2"},
+    "artifact_options": {
+      "type": "object",
+      "required": ["path_privacy"],
+      "properties": {"path_privacy": {"enum": ["heuristic", "hashed", "opaque"]}},
+      "additionalProperties": false
+    },
     "subject": {
       "type": "object",
-      "required": ["repository", "subject_revision", "source_inventory_digest", "decision_model_digest", "checker_version", "profile_coverage", "profile_language_support", "checker_coverage", "checker_input_hash"],
+      "required": ["repository", "subject_revision", "source_inventory_digest", "decision_model_digest", "routing_model_digest", "detector_model_digest", "checker_model_digest", "catalog_digest", "composition_digest", "support_matrix_digest", "checker_version", "profile_coverage", "profile_language_support", "checker_coverage", "checker_input_hash"],
       "properties": {
         "repository": {"type": "string", "minLength": 1},
         "subject_revision": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
         "source_inventory_digest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
         "decision_model_digest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+        "routing_model_digest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+        "detector_model_digest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+        "checker_model_digest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+        "catalog_digest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+        "composition_digest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+        "support_matrix_digest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
         "checker_version": {"type": "string", "minLength": 1},
         "profile_coverage": {"enum": ["complete", "partial"]},
         "profile_language_support": {"enum": ["supported", "partial", "unsupported"]},
@@ -57,9 +69,10 @@
           "attack_path": {"type": "string", "minLength": 1},
           "evidence": {
             "type": "object",
-            "required": ["path", "locator", "evidence_id", "location_id", "content_digest", "fingerprint", "subject_revision"],
+            "required": ["path", "path_identity", "locator", "evidence_id", "location_id", "content_digest", "fingerprint", "subject_revision"],
             "properties": {
               "path": {"type": "string", "minLength": 1},
+              "path_identity": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
               "locator": {"type": "string", "pattern": "^line:[1-9][0-9]*$"},
               "evidence_id": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
               "location_id": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},

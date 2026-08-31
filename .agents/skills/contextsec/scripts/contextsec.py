@@ -20,6 +20,7 @@ import benchmark  # noqa: E402
 import check_controls  # noqa: E402
 import control_ledger  # noqa: E402
 import external_review  # noqa: E402
+import evaluate_holdout  # noqa: E402
 import profile_repo  # noqa: E402
 import validate_catalog  # noqa: E402
 import validate_checks  # noqa: E402
@@ -40,9 +41,13 @@ def doctor() -> int:
         "python_supported": sys.version_info >= (3, 11),
         "platform": platform.system().lower(),
         "decision_model_digest": profile_repo.DECISION_MODEL_DIGEST,
-        "profile_frameworks": matrix["profile"]["frameworks"],
-        "checker_frameworks": matrix["checker"]["frameworks"],
-        "checker_control_shapes": matrix["checker"]["control_shapes"],
+        "routing_model_digest": profile_repo.ROUTING_MODEL_DIGEST,
+        "detector_model_digest": profile_repo.DETECTOR_MODEL_DIGEST,
+        "checker_model_digest": check_controls.CHECKER_MODEL_DIGEST,
+        "catalog_digest": profile_repo.CATALOG_DIGEST,
+        "composition_digest": profile_repo.COMPOSITION_DIGEST,
+        "support_matrix_digest": profile_repo.SUPPORT_MATRIX_DIGEST,
+        "support_matrix": matrix,
     }
     print(json.dumps(payload, indent=2, sort_keys=True, ensure_ascii=False))
     return 0 if payload["python_supported"] else 1
@@ -132,6 +137,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             "validate-checks",
             "validate-ledger",
             "external-review",
+            "evaluate-holdout",
             "doctor",
         ),
     )
@@ -157,6 +163,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         return validate_ledger.main(args.arguments)
     if args.command == "external-review":
         return external_review.main(args.arguments)
+    if args.command == "evaluate-holdout":
+        return evaluate_holdout.main(args.arguments)
     explain_parser = argparse.ArgumentParser(prog="contextsec explain")
     explain_parser.add_argument("identifier")
     explain_parser.add_argument("--repo", type=Path)

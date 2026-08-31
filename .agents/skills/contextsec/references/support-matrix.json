@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/niansia/ContextSec/v0.3.1/.agents/skills/contextsec/references/support-matrix.json",
-  "schema_version": "0.3.1",
+  "$id": "https://raw.githubusercontent.com/niansia/ContextSec/v0.3.2/.agents/skills/contextsec/references/support-matrix.json",
+  "schema_version": "0.3.2",
   "profile": {
     "supported_manifests": ["package.json", "pyproject.toml", "requirements.txt", "requirements.in", "Pipfile"],
     "unsupported_manifests": ["Gemfile", "go.mod", "Cargo.toml", "pom.xml", "build.gradle", "build.gradle.kts", "composer.json"],

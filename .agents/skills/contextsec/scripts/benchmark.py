@@ -24,6 +24,7 @@ if str(SCRIPT_DIR) not in sys.path:
 import check_controls  # noqa: E402
 import control_ledger  # noqa: E402
 import profile_repo  # noqa: E402
+import safe_io  # noqa: E402
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[4]
 DEFAULT_MANIFEST = REPOSITORY_ROOT / "benchmarks" / "scenarios.json"
@@ -88,7 +89,9 @@ def _adversarial_source(recipe: str, size: int) -> str:
 def run_adversarial_performance(
     manifest_path: Path = DEFAULT_ADVERSARIAL_MANIFEST,
 ) -> Dict[str, Any]:
-    manifest = profile_repo.strict_json_loads(manifest_path.read_text(encoding="utf-8"))
+    manifest = safe_io.read_json_object_bounded(
+        manifest_path, 8 * 1024 * 1024, "Regression benchmark manifest"
+    )
     cases = manifest.get("cases") if isinstance(manifest, dict) else None
     ceiling = manifest.get("max_seconds_per_case") if isinstance(manifest, dict) else None
     if (
@@ -173,7 +176,9 @@ def _required_counts(expected: str, actual: str, counts: Dict[str, int]) -> None
 def run_benchmark(manifest_path: Path = DEFAULT_MANIFEST) -> Dict[str, Any]:
     """Run the original authored regression corpus."""
 
-    manifest = profile_repo.strict_json_loads(manifest_path.read_text(encoding="utf-8"))
+    manifest = safe_io.read_json_object_bounded(
+        manifest_path, 8 * 1024 * 1024, "Profile benchmark manifest"
+    )
     scenarios = manifest.get("automated")
     if not isinstance(scenarios, list) or not scenarios:
         raise ValueError("Benchmark manifest must contain automated scenarios.")
@@ -459,7 +464,9 @@ def run_profile_accuracy(
 ) -> Dict[str, Any]:
     """Evaluate frozen, maintainer-authored profile labels without code execution."""
 
-    manifest = profile_repo.strict_json_loads(manifest_path.read_text(encoding="utf-8"))
+    manifest = safe_io.read_json_object_bounded(
+        manifest_path, 8 * 1024 * 1024, "Mutation benchmark manifest"
+    )
     cases = manifest.get("cases") if isinstance(manifest, dict) else None
     if not isinstance(cases, list) or not cases:
         raise ValueError("Profile benchmark manifest must contain cases.")
@@ -640,7 +647,9 @@ def run_profile_accuracy(
 def run_mutations(manifest_path: Path = DEFAULT_MUTATION_MANIFEST) -> Dict[str, Any]:
     """Prove that published checker shapes change when one control is removed."""
 
-    manifest = profile_repo.strict_json_loads(manifest_path.read_text(encoding="utf-8"))
+    manifest = safe_io.read_json_object_bounded(
+        manifest_path, 8 * 1024 * 1024, "Real-repository benchmark manifest"
+    )
     cases = manifest.get("mutations") if isinstance(manifest, dict) else None
     if not isinstance(cases, list) or not cases:
         raise ValueError("Mutation manifest must contain mutations.")
@@ -751,7 +760,9 @@ def run_real_repositories(
     workspace = workspace.resolve(strict=True)
     if not workspace.is_dir():
         raise ValueError("Real-repo workspace is not a directory.")
-    manifest = profile_repo.strict_json_loads(manifest_path.read_text(encoding="utf-8"))
+    manifest = safe_io.read_json_object_bounded(
+        manifest_path, 8 * 1024 * 1024, "Adversarial benchmark manifest"
+    )
     cases = manifest.get("repositories") if isinstance(manifest, dict) else None
     if not isinstance(cases, list) or not cases:
         raise ValueError("Real-repo manifest must contain repositories.")
@@ -885,6 +896,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 "regression": run_benchmark(args.manifest),
                 "profile": run_profile_accuracy(args.profile_manifest),
                 "mutation": run_mutations(args.mutation_manifest),
+                "adversarial": run_adversarial_performance(
+                    args.adversarial_manifest
+                ),
             }
             result = {
                 "schema_version": BENCHMARK_VERSION,

@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import Any, Dict, Iterable
 
 import versioning
+import safe_io
 
 MATRIX_PATH = Path(__file__).resolve().parents[1] / "references" / "support-matrix.json"
 
@@ -24,7 +24,9 @@ def _string_list(value: Any, label: str) -> list[str]:
 
 def load_support_matrix(path: Path = MATRIX_PATH) -> Dict[str, Any]:
     try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
+        payload = safe_io.read_json_object_bounded(
+            path, 2 * 1024 * 1024, "Support matrix"
+        )
     except (OSError, ValueError, RecursionError) as exc:
         raise RuntimeError("Unable to load ContextSec support matrix.") from exc
     if not isinstance(payload, dict) or set(payload) != {

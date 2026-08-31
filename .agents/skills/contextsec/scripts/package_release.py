@@ -82,7 +82,7 @@ def build_archive(output: Path, root: Path = REPOSITORY_ROOT) -> int:
     files = list(release_files(root))
     with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_STORED) as archive:
         for relative in files:
-            data = safe_io.read_regular_file(root / relative)
+            data = safe_io.read_regular_file_at(root, relative)
             info = zipfile.ZipInfo(relative.as_posix(), date_time=(1980, 1, 1, 0, 0, 0))
             info.create_system = 3
             info.create_version = 20
