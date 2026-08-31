@@ -1,0 +1,67 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+      - name: Verify release identity and complete test suite
+        shell: bash
+        run: |
+          version="$(tr -d '\r\n' < .agents/skills/contextsec/VERSION)"
+          test "$GITHUB_REF_NAME" = "v$version"
+          python -m unittest discover -s tests -v
+          python .agents/skills/contextsec/scripts/contextsec.py benchmark --suite all
+          python .agents/skills/contextsec/scripts/contextsec.py benchmark --suite adversarial
+      - name: Build byte-identical release archives and checksums
+        shell: bash
+        run: |
+          version="$(tr -d '\r\n' < .agents/skills/contextsec/VERSION)"
+          mkdir -p dist
+          python .agents/skills/contextsec/scripts/package_release.py --output "dist/contextsec-v$version-first.zip"
+          python .agents/skills/contextsec/scripts/package_release.py --output "dist/contextsec-v$version-second.zip"
+          cmp "dist/contextsec-v$version-first.zip" "dist/contextsec-v$version-second.zip"
+          mv "dist/contextsec-v$version-first.zip" "dist/contextsec-v$version.zip"
+          rm "dist/contextsec-v$version-second.zip"
+          cd dist
+          sha256sum "contextsec-v$version.zip" > SHA256SUMS
+      - name: Attest release archive and checksum manifest
+        uses: actions/attest-build-provenance@43d14bc2b83dec42d39ecae14e916627a18bb661 # v3
+        with:
+          subject-path: |
+            dist/contextsec-v*.zip
+            dist/SHA256SUMS
+      - name: Publish draft after every asset is attached
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="$(tr -d '\r\n' < .agents/skills/contextsec/VERSION)"
+          gh release create "$GITHUB_REF_NAME" \
+            "dist/contextsec-v$version.zip" \
+            "dist/SHA256SUMS" \
+            --verify-tag \
+            --draft \
+            --generate-notes \
+            --title "ContextSec v$version"
+          gh release edit "$GITHUB_REF_NAME" --draft=false

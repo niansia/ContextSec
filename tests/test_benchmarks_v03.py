@@ -121,7 +121,7 @@ class V03BenchmarkTests(unittest.TestCase):
         )
         self.assertTrue(
             all(
-                item["detector"]["version"] == "0.3.0"
+                item["detector"]["version"] == PROFILE.DETECTOR_VERSION
                 for item in profile["observations"]
             )
         )
@@ -132,7 +132,7 @@ class V03BenchmarkTests(unittest.TestCase):
             )
             current_profile = PROFILE.profile_repository(root)
             checks = CHECKS.check_repository(root, profile=current_profile)
-        self.assertEqual("0.3.0", checks["subject"]["checker_version"])
+        self.assertEqual(CHECKS.CHECKER_VERSION, checks["subject"]["checker_version"])
 
 
 if __name__ == "__main__":

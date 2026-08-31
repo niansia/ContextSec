@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import platform
 import sys
 from pathlib import Path
 from typing import Any, Dict, Optional, Sequence
@@ -18,11 +19,33 @@ if str(SCRIPT_DIR) not in sys.path:
 import benchmark  # noqa: E402
 import check_controls  # noqa: E402
 import control_ledger  # noqa: E402
+import external_review  # noqa: E402
 import profile_repo  # noqa: E402
 import validate_catalog  # noqa: E402
 import validate_checks  # noqa: E402
 import validate_ledger  # noqa: E402
 import validate_profile  # noqa: E402
+import support_matrix  # noqa: E402
+import versioning  # noqa: E402
+
+
+def doctor() -> int:
+    matrix = support_matrix.SUPPORT_MATRIX
+    payload = {
+        "tool_version": versioning.TOOL_VERSION,
+        "schema_version": versioning.SCHEMA_VERSION,
+        "detector_version": profile_repo.DETECTOR_VERSION,
+        "checker_version": check_controls.CHECKER_VERSION,
+        "python": platform.python_version(),
+        "python_supported": sys.version_info >= (3, 11),
+        "platform": platform.system().lower(),
+        "decision_model_digest": profile_repo.DECISION_MODEL_DIGEST,
+        "profile_frameworks": matrix["profile"]["frameworks"],
+        "checker_frameworks": matrix["checker"]["frameworks"],
+        "checker_control_shapes": matrix["checker"]["control_shapes"],
+    }
+    print(json.dumps(payload, indent=2, sort_keys=True, ensure_ascii=False))
+    return 0 if payload["python_supported"] else 1
 
 
 def explain(identifier: str, root: Optional[Path] = None) -> int:
@@ -94,6 +117,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         description="Profile product risk, explain routing, check controls, and evaluate releases.",
     )
     parser.add_argument(
+        "--version", action="version", version="%(prog)s " + versioning.TOOL_VERSION
+    )
+    parser.add_argument(
         "command",
         choices=(
             "profile",
@@ -105,10 +131,14 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             "validate-profile",
             "validate-checks",
             "validate-ledger",
+            "external-review",
+            "doctor",
         ),
     )
     parser.add_argument("arguments", nargs=argparse.REMAINDER)
     args = parser.parse_args(argv)
+    if args.command == "doctor":
+        return doctor()
     if args.command == "profile":
         return profile_repo.main(args.arguments)
     if args.command == "check":
@@ -125,6 +155,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         return validate_checks.main(args.arguments)
     if args.command == "validate-ledger":
         return validate_ledger.main(args.arguments)
+    if args.command == "external-review":
+        return external_review.main(args.arguments)
     explain_parser = argparse.ArgumentParser(prog="contextsec explain")
     explain_parser.add_argument("identifier")
     explain_parser.add_argument("--repo", type=Path)

@@ -19,10 +19,11 @@ if str(SCRIPT_DIR) not in sys.path:
 import check_controls  # noqa: E402
 import profile_repo  # noqa: E402
 import validate_checks  # noqa: E402
+import versioning  # noqa: E402
 
 REFERENCE_DIR = Path(__file__).resolve().parents[1] / "references"
 COMPOSITION_PATH = REFERENCE_DIR / "compositions" / "catalog.json"
-SCHEMA_VERSION = "0.3.0"
+SCHEMA_VERSION = versioning.SCHEMA_VERSION
 APPLICABILITY_STATES = {"required", "candidate", "not_applicable", "unknown"}
 VERIFICATION_STATES = {"verified", "failed", "unknown", "waived"}
 
@@ -477,9 +478,12 @@ def evaluate_repository(
     root: Path,
     supplied_evidence: Optional[Mapping[str, Any]] = None,
     as_of: Optional[date] = None,
+    path_privacy: str = "heuristic",
 ) -> Dict[str, Any]:
-    profile = profile_repo.profile_repository(root)
-    checks = check_controls.check_repository(root, profile=profile)
+    profile = profile_repo.profile_repository(root, path_privacy=path_privacy)
+    checks = check_controls.check_repository(
+        root, profile=profile, path_privacy=path_privacy
+    )
     return build_ledger(profile, checks, supplied_evidence, as_of)
 
 
@@ -493,11 +497,18 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         "--as-of", help="Deterministic waiver evaluation date (YYYY-MM-DD)."
     )
     parser.add_argument("--output", type=Path)
+    parser.add_argument(
+        "--path-privacy",
+        choices=profile_repo.PATH_PRIVACY_MODES,
+        default="heuristic",
+    )
     args = parser.parse_args(argv)
     try:
         supplied = load_json_object(args.evidence) if args.evidence else None
         as_of = date.fromisoformat(args.as_of) if args.as_of else None
-        result = evaluate_repository(Path(args.repo), supplied, as_of)
+        result = evaluate_repository(
+            Path(args.repo), supplied, as_of, args.path_privacy
+        )
         rendered = json.dumps(result, indent=2, sort_keys=True, ensure_ascii=False) + "\n"
         if args.output:
             profile_repo.write_output_atomic(args.output, rendered)

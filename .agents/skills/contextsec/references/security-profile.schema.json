@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://contextsec.dev/schemas/security-profile-0.3.0.json",
+  "$id": "https://raw.githubusercontent.com/niansia/ContextSec/v0.3.1/.agents/skills/contextsec/references/security-profile.schema.json",
   "title": "ContextSec Security Profile",
   "$defs": {
     "pack": {
@@ -22,7 +22,7 @@
     "limitations"
   ],
   "properties": {
-    "schema_version": {"const": "0.3.0"},
+    "schema_version": {"const": "0.3.1"},
     "subject": {
       "type": "object",
       "required": ["repository", "subject_revision", "source_inventory_digest", "decision_model_digest", "files_scanned", "files_skipped", "bytes_scanned"],
@@ -47,13 +47,14 @@
         "production_files_considered": {"type": "integer", "minimum": 0},
         "skip_counts": {
           "type": "object",
-          "required": ["non_production_scope", "file_size_limit", "total_byte_limit", "stat_error", "read_error", "binary", "invalid_encoding", "invalid_manifest"],
+          "required": ["non_production_scope", "file_size_limit", "total_byte_limit", "stat_error", "read_error", "unsafe_file", "binary", "invalid_encoding", "invalid_manifest"],
           "properties": {
             "non_production_scope": {"type": "integer", "minimum": 0},
             "file_size_limit": {"type": "integer", "minimum": 0},
             "total_byte_limit": {"type": "integer", "minimum": 0},
             "stat_error": {"type": "integer", "minimum": 0},
             "read_error": {"type": "integer", "minimum": 0},
+            "unsafe_file": {"type": "integer", "minimum": 0},
             "binary": {"type": "integer", "minimum": 0},
             "invalid_encoding": {"type": "integer", "minimum": 0},
             "invalid_manifest": {"type": "integer", "minimum": 0}

@@ -1,0 +1,18 @@
+cff-version: 1.2.0
+message: "If you use ContextSec in research or evaluation, please cite this software."
+type: software
+title: "ContextSec"
+abstract: "A deterministic product-security applicability and evidence layer for AI coding agents."
+authors:
+  - family-names: "niansia"
+version: 0.3.1
+date-released: 2026-08-31
+license: Apache-2.0
+repository-code: "https://github.com/niansia/ContextSec"
+url: "https://github.com/niansia/ContextSec"
+keywords:
+  - product security
+  - secure coding
+  - AI coding agents
+  - security controls
+  - software supply chain

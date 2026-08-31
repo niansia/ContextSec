@@ -54,7 +54,7 @@ Each observation contains:
 - repository-relative path and locator;
 - a stable `location_id`, whole-file `content_digest`, content-bound `fingerprint`, and profile `subject_revision`.
 
-The stable IDs support comparison; the digest/fingerprint detect source change. Hashes are integrity identifiers, not secrecy. The artifact does not contain matched text, secret values, full PII, environment contents, or absolute local paths. `.env`-family files are reduced to key names before content hashing or observation generation; values never become evidence material.
+The stable IDs support comparison; the digest/fingerprint detect source change. Hashes are integrity identifiers, not secrecy. The artifact does not contain matched source text, source-content values, environment contents, or absolute local paths. `.env`-family files are reduced to key names before content hashing or observation generation; values never become evidence material. Repository-relative filenames use bounded heuristic redaction by default, so filenames can still carry personal data; `hashed` and `opaque` path modes remove those names from Profile, Checks, and Ledger artifacts.
 
 ## Claim semantics
 
@@ -88,7 +88,7 @@ The profiler runs once per repository evaluation. Its `subject_revision`, reposi
 
 - No target import, code execution, package script, build, migration, scanner, or test.
 - No network access.
-- No following of repository symlinks.
+- No following of repository symlinks. Every selected input is opened by descriptor, its opened identity must equal the pre-open `lstat` identity, and descriptor metadata must remain stable through the read; observed replacement or mutation fails closed as partial coverage.
 - Bounded file count, single-file bytes, and total bytes.
 - Production dependency scope is distinct from development dependencies.
 - Lexical comment/string policy is selected by language; JavaScript does not inherit SQL `--` or Python/YAML `#` comments.
@@ -96,6 +96,8 @@ The profiler runs once per repository evaluation. Its `subject_revision`, reposi
 - Stable ordering and no implicit timestamps, so the same byte-identical scope and explicit inputs yield the same profile or ledger.
 - Errors and limits become explicit limitations or non-zero process exits, never a pass.
 - Coverage has separate dimensions: unreadable, invalid, binary, or bounded-out production input makes traversal `partial`; the detected stack is independently `supported`, `partial`, or `unsupported`. Any non-supported dimension prevents a release pass.
+
+ContextSec does not claim to create an operating-system-wide atomic filesystem snapshot. The descriptor checks close the check-then-read symlink/reparse race and detect ordinary in-place mutation, but a repository under active adversarial local mutation should still be evaluated from an isolated, immutable checkout.
 
 ## Why packs are not the moat
 

@@ -9,13 +9,13 @@ ContextSec control language is original. The following primary sources inform te
 | [Agent Skills specification and reference validator](https://github.com/agentskills/agentskills/tree/69ef37e9424c0a7ea9dd2293b559e43ec8176379) | Commit `69ef37e9424c0a7ea9dd2293b559e43ec8176379` | Skill structure, frontmatter, progressive disclosure, pinned CI validation |
 | [OWASP ASVS](https://owasp.org/www-project-application-security-verification-standard/) | 5.0.0 stable | Web/application control navigation |
 | [OWASP API Security Top 10](https://owasp.org/API-Security/) | 2023 edition | Inbound and unsafe third-party API risk navigation |
-| [OWASP Cheat Sheet Series](https://cheatsheetseries.owasp.org/) | Current on review date | Focused implementation guidance |
+| [OWASP Cheat Sheet Series](https://cheatsheetseries.owasp.org/) | Living site snapshot reviewed 2026-08-31; no runtime fetch | Focused implementation guidance |
 | [PCI DSS](https://www.pcisecuritystandards.org/standards/pci-dss/) | 4.0.1 baseline used by this preview | Payment-data scope navigation only |
 | [NIST Privacy Framework](https://www.nist.gov/privacy-framework) | 1.0 baseline used by this preview | Privacy-risk and data-lifecycle navigation |
 | [NIST SSDF SP 800-218](https://csrc.nist.gov/pubs/sp/800/218/final) | 1.1 final | Secure development and provenance navigation |
 | [SLSA](https://slsa.dev/spec/v1.2/) | 1.2 | Supply-chain provenance navigation |
-| [OWASP Top 10 for Agentic Applications](https://owasp.org/www-project-top-10-for-agentic-applications/) | Current on review date | Agent autonomy and tool-risk navigation |
-| [OWASP Agentic Skills Top 10](https://owasp.org/www-project-agentic-skills-top-10/top10) | Current on review date | Security of ContextSec itself and untrusted skill instructions |
+| [OWASP Top 10 for Agentic Applications](https://genai.owasp.org/resource/owasp-top-10-for-agentic-applications-for-2026/) | 2026 release, reviewed 2026-08-31 | Agent autonomy and tool-risk navigation |
+| [OWASP Agentic Skills Top 10](https://owasp.org/www-project-agentic-skills-top-10/top10) | v1 public-review line; project tools reported document v0.5 on 2026-08-31 | Security of ContextSec itself and untrusted skill instructions |
 | [Zeabur incident update](https://status.zeabur.com/incident/1037896?mp=true) | Ongoing investigation, update dated 2026-08-29 | Confirmed facts for secret-plane and cloud-control-plane incident mapping; unconfirmed root-cause conclusions excluded |
 | [GitHub Advisory GHSA-mrrh-fwg8-r2c3](https://github.com/advisories/ghsa-mrrh-fwg8-r2c3) | GitHub-reviewed advisory, updated 2025-10-22 | CI action mutability, runner secret exposure, and rotation incident mapping |
 | [Coinbase support insider disclosure](https://www.coinbase.com/en-nl/blog/protecting-our-customers-standing-up-to-extortionists) | First-party disclosure dated 2025-05-15 | Support/admin data access and high-impact transaction incident mapping |

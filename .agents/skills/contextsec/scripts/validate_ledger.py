@@ -11,12 +11,14 @@ from datetime import date
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence
 
+import versioning
+
 REFERENCE_DIR = Path(__file__).resolve().parents[1] / "references"
 CATALOG = json.loads((REFERENCE_DIR / "catalog.json").read_text(encoding="utf-8"))
 COMPOSITIONS = json.loads(
     (REFERENCE_DIR / "compositions" / "catalog.json").read_text(encoding="utf-8")
 )
-VERSION = "0.3.0"
+VERSION = versioning.SCHEMA_VERSION
 APPLICABILITY = {"required", "candidate", "not_applicable", "unknown"}
 VERIFICATION = {"verified", "failed", "unknown", "waived"}
 SEVERITY = {"critical", "high", "medium", "low", "info"}
