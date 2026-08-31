@@ -389,7 +389,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     parser.add_argument("--allow-unsigned-development", action="store_true")
     args = parser.parse_args(argv)
     try:
-        trust = None
+        headline_trust = False
         if args.labels_attestation_repo or args.predictions_attestation_repo:
             if not args.labels_attestation_repo or not args.predictions_attestation_repo:
                 raise ValueError("Both label and prediction attestations are required.")
@@ -407,6 +407,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                     signer_workflow=args.predictions_signer_workflow,
                 ),
             }
+            if not _trusted_evidence(trust):
+                raise ValueError(
+                    "Trusted label attestation must predate the prediction attestation."
+                )
+            headline_trust = True
         elif not args.allow_unsigned_development:
             raise ValueError(
                 "Signed label and prediction attestations are required for a headline report; use --allow-unsigned-development only for non-headline local work."
@@ -414,7 +419,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         result = evaluate(
             _load(args.labels, "External holdout labels", 8 * 1024 * 1024),
             _load(args.predictions, "External holdout predictions", 64 * 1024 * 1024),
-            _trusted_evidence(trust),
+            headline_trust,
         )
     except (OSError, ValueError, UnicodeDecodeError, RecursionError) as exc:
         print("error: " + str(exc), file=sys.stderr)
