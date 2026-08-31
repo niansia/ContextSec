@@ -200,7 +200,7 @@ def _trusted_evidence(evidence_trust: Optional[Mapping[str, Any]]) -> bool:
 def evaluate(
     labels_payload: Mapping[str, Any],
     predictions: Mapping[str, Any],
-    evidence_trust: Optional[Mapping[str, Any]] = None,
+    headline_trust: bool = False,
 ) -> Dict[str, Any]:
     external_review.evaluate(labels_payload)
     if set(predictions) != {"$schema", "version", "status", "tool", "cases"}:
@@ -325,7 +325,7 @@ def evaluate(
 
     frameworks = sorted({str(row["framework_group"]) for row in rows})
     support_classes = ("supported", "partial", "unsupported")
-    trusted = _trusted_evidence(evidence_trust)
+    trusted = headline_trust is True
     return {
         "schema_version": "0.4.0",
         "suite": "independent_holdout_accuracy",
@@ -414,7 +414,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         result = evaluate(
             _load(args.labels, "External holdout labels", 8 * 1024 * 1024),
             _load(args.predictions, "External holdout predictions", 64 * 1024 * 1024),
-            trust,
+            _trusted_evidence(trust),
         )
     except (OSError, ValueError, UnicodeDecodeError, RecursionError) as exc:
         print("error: " + str(exc), file=sys.stderr)
