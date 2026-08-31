@@ -64,15 +64,15 @@ jobs:
           cmp /tmp/contextsec-first.zip /tmp/contextsec-second.zip
       - name: Dogfood repository and core-engine profiles, checks, evidence, and ledger
         run: |
-          python .agents/skills/contextsec/scripts/contextsec.py profile --repo . --output contextsec-profile.json
-          python .agents/skills/contextsec/scripts/contextsec.py validate-profile contextsec-profile.json
-          python .agents/skills/contextsec/scripts/contextsec.py profile --repo .agents/skills/contextsec --output contextsec-core-profile.json
-          python .agents/skills/contextsec/scripts/contextsec.py validate-profile contextsec-core-profile.json
-          python .agents/skills/contextsec/scripts/contextsec.py check --repo . --output contextsec-checks.json
-          python .agents/skills/contextsec/scripts/contextsec.py validate-checks contextsec-checks.json
-          python .agents/skills/contextsec/scripts/audit_ci.py --repo . --profile contextsec-profile.json --output contextsec-ci-evidence.json
-          python .agents/skills/contextsec/scripts/contextsec.py gate --repo . --evidence contextsec-ci-evidence.json --output contextsec-ledger.json
-          python .agents/skills/contextsec/scripts/contextsec.py validate-ledger contextsec-ledger.json
+          python .agents/skills/contextsec/scripts/contextsec.py profile --repo . --output /tmp/contextsec-profile.json
+          python .agents/skills/contextsec/scripts/contextsec.py validate-profile /tmp/contextsec-profile.json
+          python .agents/skills/contextsec/scripts/contextsec.py profile --repo .agents/skills/contextsec --output /tmp/contextsec-core-profile.json
+          python .agents/skills/contextsec/scripts/contextsec.py validate-profile /tmp/contextsec-core-profile.json
+          python .agents/skills/contextsec/scripts/contextsec.py check --repo . --output /tmp/contextsec-checks.json
+          python .agents/skills/contextsec/scripts/contextsec.py validate-checks /tmp/contextsec-checks.json
+          python .agents/skills/contextsec/scripts/audit_ci.py --repo . --profile /tmp/contextsec-profile.json --output /tmp/contextsec-ci-evidence.json
+          python .agents/skills/contextsec/scripts/contextsec.py gate --repo . --evidence /tmp/contextsec-ci-evidence.json --output /tmp/contextsec-ledger.json
+          python .agents/skills/contextsec/scripts/contextsec.py validate-ledger /tmp/contextsec-ledger.json
 
   agent-skill-spec:
     runs-on: ubuntu-latest
