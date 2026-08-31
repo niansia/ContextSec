@@ -108,12 +108,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          for attempt in {1..30}; do
+          for attempt in {1..60}; do
             if gh release verify "$GITHUB_REF_NAME"; then
               exit 0
             fi
-            if [ "$attempt" -eq 30 ]; then
-              echo "Release attestation was not available after 30 attempts." >&2
+            if [ "$attempt" -eq 60 ]; then
+              echo "Release attestation was not available after 60 attempts." >&2
               exit 1
             fi
             sleep 10
