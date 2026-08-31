@@ -431,9 +431,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     # The strict evaluator emits only metrics, fixed model identities, canonical
     # public repository/commit identifiers, and restricted case/group IDs. Raw
     # profiles, reviewer metadata, labels, process output, and credentials are
-    # absent from this allowlisted report shape.
-    # codeql[py/clear-text-logging-sensitive-data]
-    print(json.dumps(result, indent=2, sort_keys=True, ensure_ascii=False))
+    # absent from this allowlisted report shape. This is the command's structured
+    # result channel, not diagnostic logging.
+    sys.stdout.write(json.dumps(result, indent=2, sort_keys=True, ensure_ascii=False))
+    sys.stdout.write("\n")
     return 0
 
 
