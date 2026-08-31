@@ -329,16 +329,20 @@ def evaluate(
 
     frameworks = sorted({str(row["framework_group"]) for row in rows})
     support_classes = ("supported", "partial", "unsupported")
-    trusted = headline_trust is True
+    headline_verified = headline_trust is True
     return {
         "schema_version": "0.4.0",
         "suite": "independent_holdout_accuracy",
-        "status": "pass" if trusted else "development-only",
-        "headline_eligible": trusted,
+        "status": "pass" if headline_verified else "development-only",
+        "headline_eligible": headline_verified,
         "evidence_trust": {
-            "labels": {"status": "verified" if trusted else "unsigned"},
-            "predictions": {"status": "verified" if trusted else "unsigned"},
-            "attestation_chronology": "verified" if trusted else "unverified",
+            "labels": {"status": "verified" if headline_verified else "unsigned"},
+            "predictions": {
+                "status": "verified" if headline_verified else "unsigned"
+            },
+            "attestation_chronology": (
+                "verified" if headline_verified else "unverified"
+            ),
         },
         "label_manifest_version": labels_payload.get("version"),
         "prediction_manifest_version": predictions.get("version"),
@@ -434,7 +438,6 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     # absent from this allowlisted report shape. This is the command's structured
     # result channel, not diagnostic logging.
 
-    # codeql[py/clear-text-logging-sensitive-data]
     sys.stdout.write(json.dumps(result, indent=2, sort_keys=True, ensure_ascii=False))
     sys.stdout.write("\n")
     return 0
