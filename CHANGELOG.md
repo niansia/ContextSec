@@ -9,7 +9,8 @@
 - Added Python FastAPI/Django/Flask, PII model, tenant model, and authentication evidence; promoted supported generic HTTP routes to direct high-confidence API evidence.
 - Narrowed the RAG sub-capability detector after a real Stripe samples case exposed false `retrieve` matches.
 - Added path-safe temporary benchmark materialization, explicit metric claim boundaries, and separate benchmark methodology/real-repository documentation.
-- Expanded CI to Ubuntu and Windows across Python 3.11–3.14, retained dogfood and reproducible archive checks, and pinned the official Agent Skills reference validator to a full commit.
+- Expanded CI to Ubuntu, macOS, and Windows across Python 3.11–3.14, smoke-tested the documented public CLI on every combination, retained dogfood and reproducible archive checks, and pinned the official Agent Skills reference validator to a full commit.
+- Added an editable, dependency-free SVG decision flow and copyable Windows, macOS, and Linux quick-start instructions.
 
 ## 0.2.1 — Applicability correctness and integrity hardening
 

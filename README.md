@@ -44,25 +44,9 @@ Control Ledger + evidence + release gate
 
 ## The decision pipeline
 
-```text
-repository + owner declarations
-              ↓
-bounded evidence observations
-              ↓
-product-risk profile
-              ↓
-required / candidate / inactive / unknown packs
-              ↓
-sub-capabilities + pack dependencies
-              ↓
-control applicability + flow intersections
-              ↓
-applicable controls + required verification
-              ↓
-Control Evaluation Ledger
-              ↓
-PASS / WARN / BLOCK / WAIVED
-```
+![ContextSec decision flow: product evidence becomes a bounded profile, applicable controls, and an evidence-backed release gate.](docs/assets/contextsec-decision-flow.svg)
+
+The diagram is a dependency-free, editable [SVG source](docs/assets/contextsec-decision-flow.svg); every label and shape remains reviewable in Git.
 
 The profiler preserves four distinctions generic security prompts usually blur:
 
@@ -200,7 +184,7 @@ The canonical skill is [.agents/skills/contextsec](.agents/skills/contextsec).
 - Agent Skills-compatible tools can load `SKILL.md` directly.
 - Keep it repository-local at `.agents/skills/contextsec`.
 - Copy the same folder to `.claude/skills/contextsec` for Claude Code.
-- Copy it to the configured Codex skill directory for a user-level Codex installation.
+- Copy it to `$HOME/.agents/skills/contextsec` for a user-level Codex installation.
 
 Use natural requests:
 
@@ -212,6 +196,61 @@ Use $contextsec to evaluate release evidence and return the Control Ledger and g
 ```
 
 The skill is the orchestration layer; `catalog.json`, composition rules, schemas, profiler, checks, and tests remain shared artifacts rather than platform-specific prompt copies.
+
+### Cross-platform quick start
+
+ContextSec has a zero-dependency Python runtime. CI runs the full test suite and public benchmark CLI on Windows, macOS, and Ubuntu with Python 3.11–3.14.
+
+#### Windows — PowerShell
+
+```powershell
+git clone https://github.com/niansia/ContextSec.git
+Set-Location ContextSec
+python -m unittest discover -s tests
+python .agents\skills\contextsec\scripts\contextsec.py benchmark --suite all
+```
+
+Optional user-level Codex installation, using the [official Codex user-skill location](https://developers.openai.com/codex/skills#where-codex-loads-local-skills):
+
+```powershell
+$destination = Join-Path $env:USERPROFILE ".agents\skills\contextsec"
+New-Item -ItemType Directory -Force -Path $destination | Out-Null
+Copy-Item -Recurse -Force ".agents\skills\contextsec\*" $destination
+```
+
+#### macOS — Terminal
+
+```bash
+git clone https://github.com/niansia/ContextSec.git
+cd ContextSec
+python3 -m unittest discover -s tests
+python3 .agents/skills/contextsec/scripts/contextsec.py benchmark --suite all
+```
+
+Optional user-level Codex installation:
+
+```bash
+mkdir -p ~/.agents/skills/contextsec
+cp -R .agents/skills/contextsec/. ~/.agents/skills/contextsec/
+```
+
+#### Linux — shell
+
+```bash
+git clone https://github.com/niansia/ContextSec.git
+cd ContextSec
+python3 -m unittest discover -s tests
+python3 .agents/skills/contextsec/scripts/contextsec.py benchmark --suite all
+```
+
+Optional user-level Codex installation:
+
+```bash
+mkdir -p ~/.agents/skills/contextsec
+cp -R .agents/skills/contextsec/. ~/.agents/skills/contextsec/
+```
+
+For repository-local use in another project, copy the canonical folder to that repository's `.agents/skills/contextsec`; Claude Code users can use `.claude/skills/contextsec` instead. Keep one canonical copy rather than maintaining platform-specific prompt forks.
 
 ## Benchmark and incident corpus
 
@@ -271,7 +310,7 @@ python .agents/skills/contextsec/scripts/contextsec.py explain secrets-managemen
 ## Roadmap
 
 1. **v0.2.1 — applicability correctness:** language-aware lexical policy, one-profile subject binding, per-control applicability, flow-aware compositions, catalog validation, and cross-platform release metadata.
-2. **v0.3.0 — benchmark proof:** Python manifest/model profiling, 36 frozen profile cases, 8 mutation pairs, 4 pinned real-repository cases, and 2 OS × Python 3.11–3.14 CI.
+2. **v0.3.0 — benchmark proof:** Python manifest/model profiling, 36 frozen profile cases, 8 mutation pairs, 4 pinned real-repository cases, and Windows/macOS/Linux × Python 3.11–3.14 CI.
 3. **v0.4 — independent ecosystem proof:** externally labeled holdout repositories, component-scoped monorepos, profile diff, signed artifacts, and comparative multi-agent evaluation.
 
 Read [architecture](docs/architecture.md), [competitive positioning](docs/competitive-positioning.md), [v0.2.1 review resolution](docs/review-resolution-v0.2.1.md), and [release roadmap](docs/roadmap.md) before proposing a large feature.

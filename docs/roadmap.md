@@ -76,7 +76,7 @@ Delivered scope:
 - required/candidate pack metrics, macro/micro F1, safety-critical recall, capability annotations, and absolute false-required counts;
 - eight single-edit mutation pairs covering every published deterministic checker shape;
 - four public repositories pinned to immutable commits, license/provenance metadata, and an opt-in local runner that verifies `HEAD`;
-- 2 OS × Python 3.11–3.14 CI, dogfood artifacts, deterministic packaging, and the official Agent Skills reference validator pinned to a commit.
+- Windows, macOS, and Linux × Python 3.11–3.14 CI, public CLI smoke tests, dogfood artifacts, deterministic packaging, and the official Agent Skills reference validator pinned to a commit.
 
 Release gate:
 

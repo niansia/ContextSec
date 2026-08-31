@@ -1,0 +1,153 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 430" role="img" aria-labelledby="title description">
+  <title id="title">ContextSec product-security decision flow</title>
+  <desc id="description">Repository and product evidence becomes a bounded security profile, which routes only applicable product-risk controls and produces an evidence-backed release gate.</desc>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --canvas: #f8fafc;
+      --surface: #ffffff;
+      --surface-strong: #eff6ff;
+      --text: #0f172a;
+      --muted: #475569;
+      --line: #cbd5e1;
+      --accent: #2563eb;
+      --accent-soft: #dbeafe;
+      --violet: #7c3aed;
+      --violet-soft: #ede9fe;
+      --good: #047857;
+      --good-soft: #d1fae5;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --canvas: #0d1117;
+        --surface: #161b22;
+        --surface-strong: #17243a;
+        --text: #f0f6fc;
+        --muted: #9da7b3;
+        --line: #30363d;
+        --accent: #58a6ff;
+        --accent-soft: #1f3b5b;
+        --violet: #bc8cff;
+        --violet-soft: #33234f;
+        --good: #56d4a0;
+        --good-soft: #163c31;
+      }
+    }
+
+    text {
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      fill: var(--text);
+    }
+
+    .canvas { fill: var(--canvas); }
+    .card { fill: var(--surface); stroke: var(--line); stroke-width: 1.5; }
+    .decision { fill: var(--surface-strong); stroke: var(--accent); stroke-width: 2; }
+    .eyebrow { font-size: 13px; font-weight: 700; letter-spacing: 1.5px; fill: var(--accent); }
+    .heading { font-size: 27px; font-weight: 700; }
+    .subtitle { font-size: 15px; fill: var(--muted); }
+    .stage { font-size: 17px; font-weight: 700; }
+    .body { font-size: 14px; fill: var(--muted); }
+    .number { fill: var(--accent); }
+    .number-text { fill: #ffffff; font-size: 12px; font-weight: 700; text-anchor: middle; }
+    .arrow { stroke: var(--accent); stroke-width: 2; fill: none; }
+    .chip { fill: var(--accent-soft); }
+    .chip-violet { fill: var(--violet-soft); }
+    .chip-good { fill: var(--good-soft); }
+    .chip-text { font-size: 12px; font-weight: 650; text-anchor: middle; }
+    .chip-text-violet { fill: var(--violet); }
+    .chip-text-good { fill: var(--good); }
+    .footer { fill: var(--surface); stroke: var(--line); stroke-width: 1; }
+    .footer-text { font-size: 14px; font-weight: 600; fill: var(--muted); text-anchor: middle; }
+    .divider { stroke: var(--line); stroke-width: 1; }
+  </style>
+
+  <defs>
+    <marker id="arrowhead" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+      <path d="M0,0 L8,4 L0,8 Z" fill="var(--accent)" />
+    </marker>
+  </defs>
+
+  <rect class="canvas" width="1200" height="430" rx="18" />
+
+  <text class="eyebrow" x="40" y="42">CONTEXTSEC · DECISION LAYER</text>
+  <text class="heading" x="40" y="75">From product reality to applicable security evidence</text>
+  <text class="subtitle" x="40" y="100">The framework stays the same. The required controls change with what the product actually does.</text>
+
+  <path class="arrow" marker-end="url(#arrowhead)" d="M226 214 H266" />
+  <path class="arrow" marker-end="url(#arrowhead)" d="M446 214 H486" />
+  <path class="arrow" marker-end="url(#arrowhead)" d="M706 214 H746" />
+  <path class="arrow" marker-end="url(#arrowhead)" d="M926 214 H966" />
+
+  <g id="stage-evidence">
+    <rect class="card" x="36" y="132" width="190" height="180" rx="14" />
+    <circle class="number" cx="61" cy="157" r="13" />
+    <text class="number-text" x="61" y="161">1</text>
+    <text class="stage" x="82" y="163">Product evidence</text>
+    <line class="divider" x1="55" y1="180" x2="207" y2="180" />
+    <text class="body" x="55" y="207">Repository · PRD · diff</text>
+    <text class="body" x="55" y="232">Dependencies and routes</text>
+    <text class="body" x="55" y="257">Schemas and workflows</text>
+    <text class="body" x="55" y="282">Owner declarations</text>
+  </g>
+
+  <g id="stage-profile">
+    <rect class="card" x="266" y="132" width="180" height="180" rx="14" />
+    <circle class="number" cx="291" cy="157" r="13" />
+    <text class="number-text" x="291" y="161">2</text>
+    <text class="stage" x="312" y="163">Security profile</text>
+    <line class="divider" x1="285" y1="180" x2="427" y2="180" />
+    <text class="body" x="285" y="207">Bounded observations</text>
+    <text class="body" x="285" y="232">Capabilities and flows</text>
+    <text class="body" x="285" y="257">Confidence and conflicts</text>
+    <text class="body" x="285" y="282">Explicit coverage gaps</text>
+  </g>
+
+  <g id="stage-routing">
+    <rect class="decision" x="486" y="122" width="220" height="200" rx="16" />
+    <circle class="number" cx="511" cy="147" r="13" />
+    <text class="number-text" x="511" y="151">3</text>
+    <text class="stage" x="532" y="153">Risk routing</text>
+    <text class="body" x="505" y="181">What applies right now?</text>
+    <rect class="chip" x="505" y="200" width="82" height="27" rx="7" />
+    <text class="chip-text" x="546" y="218">required</text>
+    <rect class="chip-violet" x="596" y="200" width="91" height="27" rx="7" />
+    <text class="chip-text chip-text-violet" x="641.5" y="218">candidate</text>
+    <rect class="chip" x="505" y="237" width="82" height="27" rx="7" />
+    <text class="chip-text" x="546" y="255">inactive</text>
+    <rect class="chip-violet" x="596" y="237" width="91" height="27" rx="7" />
+    <text class="chip-text chip-text-violet" x="641.5" y="255">unknown</text>
+    <text class="body" x="505" y="292">16 packs + intersections</text>
+  </g>
+
+  <g id="stage-controls">
+    <rect class="card" x="746" y="132" width="180" height="180" rx="14" />
+    <circle class="number" cx="771" cy="157" r="13" />
+    <text class="number-text" x="771" y="161">4</text>
+    <text class="stage" x="792" y="163">Active controls</text>
+    <line class="divider" x1="765" y1="180" x2="907" y2="180" />
+    <text class="body" x="765" y="207">Applicable invariants</text>
+    <text class="body" x="765" y="232">Cross-context rules</text>
+    <text class="body" x="765" y="257">Required verification</text>
+    <text class="body" x="765" y="282">Negative tests</text>
+  </g>
+
+  <g id="stage-gate">
+    <rect class="card" x="966" y="132" width="198" height="180" rx="14" />
+    <circle class="number" cx="991" cy="157" r="13" />
+    <text class="number-text" x="991" y="161">5</text>
+    <text class="stage" x="1012" y="163">Ledger + gate</text>
+    <line class="divider" x1="985" y1="180" x2="1145" y2="180" />
+    <text class="body" x="985" y="207">Evidence-bound status</text>
+    <text class="body" x="985" y="232">Reproducible decisions</text>
+    <rect class="chip-good" x="985" y="252" width="160" height="31" rx="7" />
+    <text class="chip-text chip-text-good" x="1065" y="272">PASS · WARN · BLOCK</text>
+  </g>
+
+  <rect class="footer" x="36" y="350" width="1128" height="48" rx="12" />
+  <text class="footer-text" x="224" y="380">No generic checklist</text>
+  <text class="footer-text" x="600" y="380">Unknown remains unknown</text>
+  <text class="footer-text" x="976" y="380">No finding ≠ verified</text>
+  <circle cx="405" cy="375" r="3" fill="var(--line)" />
+  <circle cx="785" cy="375" r="3" fill="var(--line)" />
+</svg>
