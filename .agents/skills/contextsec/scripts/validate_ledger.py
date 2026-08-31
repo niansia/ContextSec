@@ -13,6 +13,8 @@ from typing import Any, Dict, List, Mapping, Optional, Sequence
 
 import versioning
 import safe_io
+import profile_repo
+import validate_checks
 
 REFERENCE_DIR = Path(__file__).resolve().parents[1] / "references"
 CATALOG = safe_io.read_json_object_bounded(
@@ -76,7 +78,7 @@ def validate(payload: Mapping[str, Any], as_of: Optional[date] = None) -> List[s
     else:
         exact(
             subject,
-            {"repository", "subject_revision", "source_inventory_digest", "decision_model_digest", "routing_model_digest", "detector_model_digest", "catalog_digest", "composition_digest", "support_matrix_digest", "checker_model_digest", "profile_coverage", "profile_language_support", "checker_coverage"},
+            {"repository", "subject_revision", "source_inventory_digest", "decision_model_digest", "routing_model_digest", "detector_version", "detector_model_digest", "checker_version", "checker_model_digest", "catalog_digest", "composition_digest", "support_matrix_digest", "profile_coverage", "profile_language_support", "checker_coverage"},
             "subject",
         )
         for field in (
@@ -92,6 +94,10 @@ def validate(payload: Mapping[str, Any], as_of: Optional[date] = None) -> List[s
         ):
             if not re.fullmatch(r"sha256:[a-f0-9]{64}", str(subject.get(field, ""))):
                 errors.append("subject." + field + " is invalid")
+        if subject.get("detector_version") != profile_repo.DETECTOR_VERSION:
+            errors.append("subject.detector_version does not match the active detector")
+        if subject.get("checker_version") != validate_checks.CHECKER_VERSION:
+            errors.append("subject.checker_version does not match the active checker")
         if subject.get("profile_coverage") not in {"complete", "partial"}:
             errors.append("subject.profile_coverage is invalid")
         if subject.get("profile_language_support") not in {

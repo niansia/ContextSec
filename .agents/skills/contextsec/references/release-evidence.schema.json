@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/niansia/ContextSec/v0.4.0/.agents/skills/contextsec/references/release-evidence.schema.json",
+  "title": "ContextSec Signed Release Evidence",
+  "type": "object",
+  "required": ["$schema", "schema_version", "artifact_type", "release", "tool", "artifact", "verification_coverage", "claim_boundary"],
+  "properties": {
+    "$schema": {"const": "https://raw.githubusercontent.com/niansia/ContextSec/v0.4.0/.agents/skills/contextsec/references/release-evidence.schema.json"},
+    "schema_version": {"const": "0.4.0"},
+    "artifact_type": {"const": "release-evidence"},
+    "release": {"type": "object"},
+    "tool": {"type": "object"},
+    "artifact": {"type": "object"},
+    "verification_coverage": {"type": "object"},
+    "claim_boundary": {"type": "string", "minLength": 1}
+  },
+  "additionalProperties": false
+}

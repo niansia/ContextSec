@@ -18,14 +18,17 @@ if str(SCRIPT_DIR) not in sys.path:
 
 import benchmark  # noqa: E402
 import check_controls  # noqa: E402
+import component_profile  # noqa: E402
 import control_ledger  # noqa: E402
 import external_review  # noqa: E402
 import evaluate_holdout  # noqa: E402
 import profile_repo  # noqa: E402
 import validate_catalog  # noqa: E402
 import validate_checks  # noqa: E402
+import validate_component_profile  # noqa: E402
 import validate_ledger  # noqa: E402
 import validate_profile  # noqa: E402
+import verification_coverage  # noqa: E402
 import support_matrix  # noqa: E402
 import versioning  # noqa: E402
 
@@ -128,16 +131,19 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         "command",
         choices=(
             "profile",
+            "profile-components",
             "check",
             "explain",
             "gate",
             "benchmark",
             "validate-catalog",
             "validate-profile",
+            "validate-component-profile",
             "validate-checks",
             "validate-ledger",
             "external-review",
             "evaluate-holdout",
+            "verification-coverage",
             "doctor",
         ),
     )
@@ -147,6 +153,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         return doctor()
     if args.command == "profile":
         return profile_repo.main(args.arguments)
+    if args.command == "profile-components":
+        return component_profile.main(args.arguments)
     if args.command == "check":
         return check_controls.main(args.arguments)
     if args.command == "gate":
@@ -157,6 +165,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         return validate_catalog.main(args.arguments)
     if args.command == "validate-profile":
         return validate_profile.main(args.arguments)
+    if args.command == "validate-component-profile":
+        return validate_component_profile.main(args.arguments)
     if args.command == "validate-checks":
         return validate_checks.main(args.arguments)
     if args.command == "validate-ledger":
@@ -165,6 +175,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         return external_review.main(args.arguments)
     if args.command == "evaluate-holdout":
         return evaluate_holdout.main(args.arguments)
+    if args.command == "verification-coverage":
+        return verification_coverage.main(args.arguments)
     explain_parser = argparse.ArgumentParser(prog="contextsec explain")
     explain_parser.add_argument("identifier")
     explain_parser.add_argument("--repo", type=Path)

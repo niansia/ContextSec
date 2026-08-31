@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run narrow, deterministic cross-context checks for the v0.3 support matrix."""
+"""Run narrow, deterministic cross-context checks for the v0.4 support matrix."""
 
 from __future__ import annotations
 
@@ -18,14 +18,51 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
 import profile_repo  # noqa: E402
+import model_digest  # noqa: E402
 import safe_io  # noqa: E402
 import support_matrix  # noqa: E402
 import versioning  # noqa: E402
 
-CHECKER_VERSION = versioning.TOOL_VERSION
-CHECKER_MODEL_DIGEST = "sha256:" + hashlib.sha256(
-    safe_io.read_regular_file(Path(__file__), 4 * 1024 * 1024)
-).hexdigest()
+CHECKER_VERSION = versioning.CHECKER_VERSION
+
+
+def checker_model_digest() -> str:
+    """Digest normalized checker behavior, orchestration, and live dependencies."""
+
+    return model_digest.semantic_model_digest(
+        path=Path(__file__),
+        symbols=(
+            "CHECKER_SUPPORTED_SUFFIXES",
+            "CHECKER_UNSUPPORTED_SUFFIXES",
+            "CHECKER_PIPELINE",
+            "checker_stack_family",
+            "digest",
+            "location",
+            "finding",
+            "load_sources",
+            "prisma_models_with_fields",
+            "check_tenant_queries",
+            "check_tenant_raw_queries",
+            "check_pii_logging",
+            "check_ai_egress",
+            "_skip_js_trivia",
+            "_js_static_string",
+            "_js_object_properties",
+            "_js_static_expression",
+            "_tenant_identity_use",
+            "check_client_public_secrets",
+            "check_public_upload",
+            "check_upload_tenant_binding",
+            "check_payment_idempotency",
+            "check_cicd_action_pins",
+            "check_cicd_declared_permissions",
+        ),
+        dependencies={
+            "detector_model_digest": profile_repo.DETECTOR_MODEL_DIGEST,
+            "safe_io": model_digest.semantic_module_digest(Path(safe_io.__file__)),
+            "support_matrix": profile_repo.SUPPORT_MATRIX_DIGEST,
+        },
+    )
 
 CHECKER_SUPPORTED_SUFFIXES = support_matrix.values("checker", "supported_suffixes")
 CHECKER_UNSUPPORTED_SUFFIXES = support_matrix.values(
@@ -847,6 +884,9 @@ def check_cicd_action_pins(
     results: List[Dict[str, Any]] = []
     action = re.compile(r"(?m)^\s*-?\s*uses\s*:\s*[\"']?(?P<value>[^\s\"'#]+)")
     immutable = re.compile(r"^[^@]+@[a-f0-9]{40}(?:[a-f0-9]{24})?$", re.IGNORECASE)
+    immutable_docker = re.compile(
+        r"^docker://[A-Za-z0-9._:/-]+@sha256:[a-f0-9]{64}$", re.IGNORECASE
+    )
     for relative, text, raw in sources:
         normalized = relative.replace("\\", "/").lower()
         if "/.github/workflows/" not in "/" + normalized:
@@ -858,7 +898,9 @@ def check_cicd_action_pins(
         )
         for match in action.finditer(comments_removed):
             value = match.group("value")
-            if value.startswith(("./", "docker://")) or immutable.fullmatch(value):
+            if value.startswith("./") or immutable.fullmatch(value):
+                continue
+            if value.startswith("docker://") and immutable_docker.fullmatch(value):
                 continue
             results.append(
                 finding(
@@ -912,6 +954,21 @@ def check_cicd_declared_permissions(
     return results
 
 
+CHECKER_PIPELINE = (
+    check_tenant_queries,
+    check_tenant_raw_queries,
+    check_pii_logging,
+    check_ai_egress,
+    check_client_public_secrets,
+    check_public_upload,
+    check_upload_tenant_binding,
+    check_payment_idempotency,
+    check_cicd_action_pins,
+    check_cicd_declared_permissions,
+)
+CHECKER_MODEL_DIGEST = checker_model_digest()
+
+
 def check_repository(
     root: Path,
     profile: Optional[Mapping[str, Any]] = None,
@@ -943,18 +1000,7 @@ def check_repository(
             "Repository changed after profiling; source inventory does not match."
         )
     findings: List[Dict[str, Any]] = []
-    for checker in (
-        check_tenant_queries,
-        check_tenant_raw_queries,
-        check_pii_logging,
-        check_ai_egress,
-        check_client_public_secrets,
-        check_public_upload,
-        check_upload_tenant_binding,
-        check_payment_idempotency,
-        check_cicd_action_pins,
-        check_cicd_declared_permissions,
-    ):
+    for checker in CHECKER_PIPELINE:
         findings.extend(checker(sources, active, path_privacy))
     findings.sort(key=lambda item: item["id"])
     for item in findings:
@@ -964,8 +1010,8 @@ def check_repository(
     limitations = [
         "These are narrow deterministic checks, not a general vulnerability scan.",
         "A missing lexical pattern is never treated as verified control evidence.",
-        "Only the documented Node.js, Next.js, Prisma, S3, Stripe, OpenAI, GitHub Actions, and public environment-name shapes are supported in v0.3.",
-        "Traversal coverage, language support, checker support, and match enumeration are reported separately; most v0.3 checkers enumerate only their first supported finding per file or repository.",
+        "Only the documented Node.js, Next.js, Prisma, S3, Stripe, OpenAI, GitHub/docker action, and public environment-name shapes are supported in v0.4.",
+        "Traversal coverage, language support, checker support, and match enumeration are reported separately; most v0.4 checkers enumerate only their first supported finding per file or repository.",
         "PII flow checks abstain on Prisma select/omit projections rather than assuming the returned shape is sensitive.",
     ]
     if profile["coverage"]["status"] == "partial":
@@ -984,6 +1030,7 @@ def check_repository(
             "subject_revision": profile["subject"]["subject_revision"],
             "decision_model_digest": profile["subject"]["decision_model_digest"],
             "routing_model_digest": profile["subject"]["routing_model_digest"],
+            "detector_version": profile["subject"]["detector_version"],
             "detector_model_digest": profile["subject"]["detector_model_digest"],
             "checker_model_digest": CHECKER_MODEL_DIGEST,
             "catalog_digest": profile["subject"]["catalog_digest"],

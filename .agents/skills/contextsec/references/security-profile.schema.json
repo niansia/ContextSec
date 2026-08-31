@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/niansia/ContextSec/v0.3.2/.agents/skills/contextsec/references/security-profile.schema.json",
+  "$id": "https://raw.githubusercontent.com/niansia/ContextSec/v0.4.0/.agents/skills/contextsec/references/security-profile.schema.json",
   "title": "ContextSec Security Profile",
   "$defs": {
     "pack": {
@@ -23,7 +23,7 @@
     "limitations"
   ],
   "properties": {
-    "schema_version": {"const": "0.3.2"},
+    "schema_version": {"const": "0.4.0"},
     "artifact_options": {
       "type": "object",
       "required": ["path_privacy"],
@@ -32,13 +32,36 @@
     },
     "subject": {
       "type": "object",
-      "required": ["repository", "subject_revision", "source_inventory_digest", "decision_model_digest", "routing_model_digest", "detector_model_digest", "catalog_digest", "composition_digest", "support_matrix_digest", "files_scanned", "files_skipped", "bytes_scanned"],
+      "required": ["repository", "source_provenance", "component", "subject_revision", "source_inventory_digest", "decision_model_digest", "routing_model_digest", "detector_version", "detector_model_digest", "catalog_digest", "composition_digest", "support_matrix_digest", "files_scanned", "files_skipped", "bytes_scanned"],
       "properties": {
         "repository": {"type": "string", "minLength": 1},
+        "source_provenance": {
+          "type": "object",
+          "required": ["status", "vcs", "repository", "commit", "worktree"],
+          "properties": {
+            "status": {"enum": ["verified", "dirty", "unavailable"]},
+            "vcs": {"type": ["string", "null"], "enum": ["git", null]},
+            "repository": {"type": ["string", "null"], "pattern": "^https://github\\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"},
+            "commit": {"type": ["string", "null"], "pattern": "^[a-f0-9]{40}$"},
+            "worktree": {"enum": ["clean", "dirty", "unavailable"]}
+          },
+          "additionalProperties": false
+        },
+        "component": {
+          "type": ["object", "null"],
+          "required": ["id", "root", "path_identity"],
+          "properties": {
+            "id": {"type": "string", "pattern": "^[a-z][a-z0-9_-]{0,63}$"},
+            "root": {"type": "string", "minLength": 1},
+            "path_identity": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"}
+          },
+          "additionalProperties": false
+        },
         "subject_revision": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
         "source_inventory_digest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
         "decision_model_digest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
         "routing_model_digest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+        "detector_version": {"type": "string", "minLength": 1},
         "detector_model_digest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
         "catalog_digest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
         "composition_digest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},

@@ -1,0 +1,24 @@
+{
+  "schema_version": "0.4.0",
+  "policy": "Every job's effective GITHUB_TOKEN permissions must exactly match this reviewed least-privilege contract.",
+  "workflows": {
+    ".github/workflows/ci.yml": {
+      "required": {"contents": "read"}
+    },
+    ".github/workflows/release.yml": {
+      "proof": {"contents": "read"},
+      "release": {
+        "attestations": "write",
+        "contents": "write",
+        "id-token": "write"
+      }
+    },
+    ".github/workflows/security-proof.yml": {
+      "agent-skill-spec": {"contents": "read"},
+      "evidence": {"contents": "read"},
+      "real-repositories": {"contents": "read"},
+      "required": {"contents": "read"},
+      "test": {"contents": "read"}
+    }
+  }
+}

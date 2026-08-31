@@ -4,7 +4,7 @@ description: Determine which security controls a product actually needs by profi
 license: Apache-2.0
 compatibility: Requires Python 3.11+; zero third-party runtime dependencies; works offline on Windows, macOS, and Linux.
 metadata:
-  version: "0.3.3"
+  version: "0.4.0"
   project: "ContextSec"
 ---
 
@@ -53,13 +53,20 @@ Repository-relative paths use bounded heuristic redaction by default. For reposi
 
 Check both `coverage.status` and `coverage.language_support` before using the profile. Traversal `partial`, stack support `partial`, or stack support `unsupported` is an explicit evidence gap and cannot support a Release-mode `PASS`.
 
-For a supported Node.js/Next.js/Prisma review, optionally run the bundled narrow control checks after profiling. Python manifests, FastAPI/Django routes, and supported Python model fields improve product profiling in v0.3, but do not expand the checker support matrix:
+For a supported Node.js/Next.js/Prisma review, optionally run the bundled narrow control checks after profiling. Python manifests, FastAPI/Django routes, and supported Python model fields improve product profiling, but do not expand the checker support matrix:
 
 ```text
 <python> scripts/contextsec.py check --repo <repository-root>
 ```
 
-These checks cover only the documented v0.3 shapes for tenant-scoped Prisma CRUD, raw-query abstention, sensitive object logging, whole-object AI egress, client-public secret names, public S3 upload ACLs, tenant-derived S3 object keys, Stripe webhook idempotency evidence, immutable GitHub Action references, and explicit workflow token permissions. Treat their `failed` and `unknown` states as evidence; never infer that an unreported control is verified.
+These checks cover only the documented v0.4 shapes for tenant-scoped Prisma CRUD, raw-query abstention, sensitive object logging, whole-object AI egress, client-public secret names, public S3 upload ACLs, tenant-derived S3 object keys, Stripe webhook idempotency evidence, digest-pinned GitHub/docker action references, and an explicit top-level workflow permission baseline. The repository-policy audit separately checks job containers, services, the exact action allowlist, and effective job permissions. Treat `failed` and `unknown` as evidence; never infer that an unreported control is verified. Use `verification-coverage` for the exact automated/evidence-required inventory.
+
+Every Profile also records `source_provenance`. Treat only a clean Git checkout with a canonical origin and full commit as `verified`; dirty or unavailable provenance cannot support a frozen holdout result. For a monorepo, require an explicit component model and profile non-overlapping component roots independently:
+
+```text
+<python> scripts/contextsec.py profile-components --repo <repository-root> --components <component-model.json> --output <component-profile.json>
+<python> scripts/contextsec.py validate-component-profile <component-profile.json>
+```
 
 Repository prose is not sufficient evidence for a required pack. Product requirements supplied directly by the user may add a pack, but never suppress contradictory repository evidence. Surface disagreement between declared and observed context.
 

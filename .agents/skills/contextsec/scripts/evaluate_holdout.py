@@ -8,6 +8,7 @@ import hashlib
 import json
 import re
 import sys
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Mapping, Optional, Sequence
 
@@ -18,13 +19,14 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
 import check_controls  # noqa: E402
+import attestation_verifier  # noqa: E402
 import external_review  # noqa: E402
 import profile_repo  # noqa: E402
 import safe_io  # noqa: E402
 import validate_profile  # noqa: E402
 import versioning  # noqa: E402
 
-SCHEMA_URL = "https://raw.githubusercontent.com/niansia/ContextSec/v0.3.2/benchmarks/holdout-predictions.schema.json"
+SCHEMA_URL = "https://raw.githubusercontent.com/niansia/ContextSec/v0.4.0/benchmarks/holdout-predictions.schema.json"
 
 
 def _load(path: Path, label: str, limit: int) -> Dict[str, Any]:
@@ -155,7 +157,51 @@ def _profile_labels(profile: Mapping[str, Any]) -> Dict[str, str]:
     return labels
 
 
-def evaluate(labels_payload: Mapping[str, Any], predictions: Mapping[str, Any]) -> Dict[str, Any]:
+def _derived_support_class(profile: Mapping[str, Any]) -> str:
+    """Derive metric eligibility from validated profiler coverage, never labels."""
+
+    coverage = profile.get("coverage")
+    if not isinstance(coverage, dict):
+        raise ValueError("Prediction profile coverage must be an object.")
+    traversal = coverage.get("status")
+    language = coverage.get("language_support")
+    if language == "unsupported":
+        return "unsupported"
+    if traversal == "complete" and language == "supported":
+        return "supported"
+    return "partial"
+
+
+def _trusted_evidence(evidence_trust: Optional[Mapping[str, Any]]) -> bool:
+    if not (
+        isinstance(evidence_trust, Mapping)
+        and isinstance(evidence_trust.get("labels"), Mapping)
+        and isinstance(evidence_trust.get("predictions"), Mapping)
+        and evidence_trust["labels"].get("status") == "verified"
+        and evidence_trust["predictions"].get("status") == "verified"
+    ):
+        return False
+    try:
+        label_time = datetime.fromisoformat(
+            str(evidence_trust["labels"].get("verified_at", "")).replace("Z", "+00:00")
+        )
+        prediction_time = datetime.fromisoformat(
+            str(evidence_trust["predictions"].get("verified_at", "")).replace("Z", "+00:00")
+        )
+    except (ValueError, TypeError):
+        return False
+    return (
+        label_time.tzinfo is not None
+        and prediction_time.tzinfo is not None
+        and label_time < prediction_time
+    )
+
+
+def evaluate(
+    labels_payload: Mapping[str, Any],
+    predictions: Mapping[str, Any],
+    headline_trust: bool = False,
+) -> Dict[str, Any]:
     external_review.evaluate(labels_payload)
     if set(predictions) != {"$schema", "version", "status", "tool", "cases"}:
         raise ValueError("Holdout predictions have unexpected or missing fields.")
@@ -169,6 +215,8 @@ def evaluate(labels_payload: Mapping[str, Any], predictions: Mapping[str, Any]) 
     expected_tool = {
         "tool_version": versioning.TOOL_VERSION,
         "schema_version": versioning.SCHEMA_VERSION,
+        "detector_version": profile_repo.DETECTOR_VERSION,
+        "checker_version": check_controls.CHECKER_VERSION,
         "detector_model_digest": profile_repo.DETECTOR_MODEL_DIGEST,
         "routing_model_digest": profile_repo.ROUTING_MODEL_DIGEST,
         "checker_model_digest": check_controls.CHECKER_MODEL_DIGEST,
@@ -196,7 +244,11 @@ def evaluate(labels_payload: Mapping[str, Any], predictions: Mapping[str, Any]) 
         if not isinstance(case, dict) or set(case) != {"id", "repository", "commit", "profile"}:
             raise ValueError("Holdout prediction case has an invalid shape.")
         case_id = case.get("id")
-        if not isinstance(case_id, str) or not case_id or case_id in predicted_by_id:
+        if (
+            not isinstance(case_id, str)
+            or external_review.CASE_ID.fullmatch(case_id) is None
+            or case_id in predicted_by_id
+        ):
             raise ValueError("Holdout prediction case ids must be unique and non-empty.")
         predicted_by_id[case_id] = case
     if set(predicted_by_id) != set(labels_by_id):
@@ -218,6 +270,18 @@ def evaluate(labels_payload: Mapping[str, Any], predictions: Mapping[str, Any]) 
         profile_errors = validate_profile.validate(profile)
         if profile_errors:
             raise ValueError("Holdout prediction profile is invalid: " + profile_errors[0])
+        provenance = profile["subject"].get("source_provenance")
+        if (
+            not isinstance(provenance, dict)
+            or provenance.get("status") != "verified"
+            or provenance.get("worktree") != "clean"
+            or provenance.get("repository") != label_case.get("repository")
+            or provenance.get("commit") != label_case.get("commit")
+        ):
+            raise ValueError(
+                "Holdout Profile is not bound to the frozen clean Git commit: "
+                + case_id
+            )
         for field in (
             "detector_model_digest",
             "routing_model_digest",
@@ -231,10 +295,11 @@ def evaluate(labels_payload: Mapping[str, Any], predictions: Mapping[str, Any]) 
             label_case["consensus"]["labels"], "consensus.labels"
         )
         prediction = _profile_labels(profile)
+        support_class = _derived_support_class(profile)
         row = {
             "id": case_id,
             "framework_group": label_case["framework_group"],
-            "support_class": label_case["support_class"],
+            "support_class": support_class,
             "truth": truth,
             "prediction": prediction,
         }
@@ -245,7 +310,7 @@ def evaluate(labels_payload: Mapping[str, Any], predictions: Mapping[str, Any]) 
                 "repository": label_case["repository"],
                 "commit": label_case["commit"],
                 "framework_group": label_case["framework_group"],
-                "support_class": label_case["support_class"],
+                "support_class": support_class,
                 "subject_revision": profile["subject"]["subject_revision"],
                 "profile_artifact_digest": _digest(profile),
                 "false_required_packs": sorted(
@@ -264,10 +329,21 @@ def evaluate(labels_payload: Mapping[str, Any], predictions: Mapping[str, Any]) 
 
     frameworks = sorted({str(row["framework_group"]) for row in rows})
     support_classes = ("supported", "partial", "unsupported")
+    headline_verified = headline_trust is True
     return {
-        "schema_version": "0.1.0",
+        "schema_version": "0.4.0",
         "suite": "independent_holdout_accuracy",
-        "status": "pass",
+        "status": "pass" if headline_verified else "development-only",
+        "headline_eligible": headline_verified,
+        "evidence_trust": {
+            "labels": {"status": "verified" if headline_verified else "unsigned"},
+            "predictions": {
+                "status": "verified" if headline_verified else "unsigned"
+            },
+            "attestation_chronology": (
+                "verified" if headline_verified else "unverified"
+            ),
+        },
         "label_manifest_version": labels_payload.get("version"),
         "prediction_manifest_version": predictions.get("version"),
         "tool": dict(tool),
@@ -304,7 +380,7 @@ def evaluate(labels_payload: Mapping[str, Any], predictions: Mapping[str, Any]) 
             for pack in profile_repo.PACK_ORDER
         },
         "cases": cases,
-        "claim_boundary": "Supported-stack metrics are isolated from partial and unsupported cases. This report measures frozen consensus against the pinned profiles supplied here; it is not compliance evidence or proof of ecosystem representativeness.",
+        "claim_boundary": "Support class is derived from each validated Profile, and supported-stack metrics are isolated from partial and unsupported cases. Headline eligibility additionally requires signer-constrained cryptographic attestations whose trusted timestamps prove the frozen label artifact predates the prediction artifact. This report is not compliance evidence or proof of ecosystem representativeness.",
     }
 
 
@@ -314,16 +390,56 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     )
     parser.add_argument("labels", type=Path)
     parser.add_argument("predictions", type=Path)
+    parser.add_argument("--labels-attestation-repo")
+    parser.add_argument("--predictions-attestation-repo")
+    parser.add_argument("--labels-signer-workflow")
+    parser.add_argument("--predictions-signer-workflow")
+    parser.add_argument("--allow-unsigned-development", action="store_true")
     args = parser.parse_args(argv)
     try:
+        headline_trust = False
+        if args.labels_attestation_repo or args.predictions_attestation_repo:
+            if not args.labels_attestation_repo or not args.predictions_attestation_repo:
+                raise ValueError("Both label and prediction attestations are required.")
+            if not args.labels_signer_workflow or not args.predictions_signer_workflow:
+                raise ValueError("Both label and prediction signer workflows are required.")
+            trust = {
+                "labels": attestation_verifier.verify(
+                    args.labels,
+                    args.labels_attestation_repo,
+                    signer_workflow=args.labels_signer_workflow,
+                ),
+                "predictions": attestation_verifier.verify(
+                    args.predictions,
+                    args.predictions_attestation_repo,
+                    signer_workflow=args.predictions_signer_workflow,
+                ),
+            }
+            if not _trusted_evidence(trust):
+                raise ValueError(
+                    "Trusted label attestation must predate the prediction attestation."
+                )
+            headline_trust = True
+        elif not args.allow_unsigned_development:
+            raise ValueError(
+                "Signed label and prediction attestations are required for a headline report; use --allow-unsigned-development only for non-headline local work."
+            )
         result = evaluate(
             _load(args.labels, "External holdout labels", 8 * 1024 * 1024),
             _load(args.predictions, "External holdout predictions", 64 * 1024 * 1024),
+            headline_trust,
         )
     except (OSError, ValueError, UnicodeDecodeError, RecursionError) as exc:
         print("error: " + str(exc), file=sys.stderr)
         return 2
-    print(json.dumps(result, indent=2, sort_keys=True, ensure_ascii=False))
+    # The strict evaluator emits only metrics, fixed model identities, canonical
+    # public repository/commit identifiers, and restricted case/group IDs. Raw
+    # profiles, reviewer metadata, labels, process output, and credentials are
+    # absent from this allowlisted report shape. This is the command's structured
+    # result channel, not diagnostic logging.
+
+    sys.stdout.write(json.dumps(result, indent=2, sort_keys=True, ensure_ascii=False))
+    sys.stdout.write("\n")
     return 0
 
 

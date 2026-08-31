@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/niansia/ContextSec/v0.3.2/.agents/skills/contextsec/references/support-matrix.json",
-  "schema_version": "0.3.2",
+  "$id": "https://raw.githubusercontent.com/niansia/ContextSec/v0.4.0/.agents/skills/contextsec/references/support-matrix.json",
+  "schema_version": "0.4.0",
   "profile": {
     "supported_manifests": ["package.json", "pyproject.toml", "requirements.txt", "requirements.in", "Pipfile"],
     "unsupported_manifests": ["Gemfile", "go.mod", "Cargo.toml", "pom.xml", "build.gradle", "build.gradle.kts", "composer.json"],
@@ -22,8 +22,8 @@
       "public S3 upload ACLs",
       "tenant-derived S3 object keys",
       "Stripe webhook idempotency evidence",
-      "immutable GitHub Action references",
-      "explicit workflow token permissions"
+      "digest-pinned GitHub Action and docker action references",
+      "explicit top-level workflow token permission baseline"
     ]
   },
   "coverage_semantics": {

@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/niansia/ContextSec/v0.4.0/.agents/skills/contextsec/references/component-model.schema.json",
+  "title": "ContextSec Monorepo Component Model",
+  "type": "object",
+  "required": ["$schema", "schema_version", "components", "flows"],
+  "properties": {
+    "$schema": {"const": "https://raw.githubusercontent.com/niansia/ContextSec/v0.4.0/.agents/skills/contextsec/references/component-model.schema.json"},
+    "schema_version": {"const": "0.4.0"},
+    "components": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "root", "kind", "depends_on"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^[a-z][a-z0-9_-]{0,63}$"},
+          "root": {"type": "string", "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\\\).+$"},
+          "kind": {"type": "string", "pattern": "^[a-z][a-z0-9_-]{0,63}$"},
+          "depends_on": {"type": "array", "items": {"type": "string", "pattern": "^[a-z][a-z0-9_-]{0,63}$"}, "uniqueItems": true}
+        },
+        "additionalProperties": false
+      }
+    },
+    "flows": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "from", "to", "capabilities", "evidence_refs"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^[a-z][a-z0-9_-]{0,63}$"},
+          "from": {"type": "string", "pattern": "^[a-z][a-z0-9_-]{0,63}$"},
+          "to": {"type": "string", "pattern": "^[a-z][a-z0-9_-]{0,63}$"},
+          "capabilities": {"type": "array", "minItems": 1, "items": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]{0,127}$"}, "uniqueItems": true},
+          "evidence_refs": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}, "uniqueItems": true}
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,13 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/niansia/ContextSec/v0.3.2/.agents/skills/contextsec/references/support-matrix.schema.json",
+  "$id": "https://raw.githubusercontent.com/niansia/ContextSec/v0.4.0/.agents/skills/contextsec/references/support-matrix.schema.json",
   "title": "ContextSec Support Matrix",
   "type": "object",
   "required": ["$schema", "$id", "schema_version", "profile", "checker", "coverage_semantics"],
   "properties": {
     "$schema": {"const": "https://json-schema.org/draft/2020-12/schema"},
-    "$id": {"const": "https://raw.githubusercontent.com/niansia/ContextSec/v0.3.2/.agents/skills/contextsec/references/support-matrix.json"},
-    "schema_version": {"const": "0.3.2"},
+    "$id": {"const": "https://raw.githubusercontent.com/niansia/ContextSec/v0.4.0/.agents/skills/contextsec/references/support-matrix.json"},
+    "schema_version": {"const": "0.4.0"},
     "profile": {
       "type": "object",
       "required": ["supported_manifests", "unsupported_manifests", "supported_suffixes", "unsupported_suffixes", "frameworks"],

@@ -25,6 +25,17 @@ IMMUTABLE_ACTION = re.compile(
     r"^(?P<action>[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)@[a-f0-9]{40}(?:[a-f0-9]{24})?$",
     re.IGNORECASE,
 )
+IMMUTABLE_DOCKER = re.compile(
+    r"^docker://(?P<image>[A-Za-z0-9._:/-]+)@sha256:[a-f0-9]{64}$",
+    re.IGNORECASE,
+)
+IMMUTABLE_CONTAINER = re.compile(
+    r"^(?P<image>[A-Za-z0-9._:/-]+)@sha256:[a-f0-9]{64}$",
+    re.IGNORECASE,
+)
+CONTAINER_IMAGE = re.compile(
+    r"(?m)^\s+image\s*:\s*[\"']?(?P<value>[^\s\"'#]+)"
+)
 UNTRUSTED_EXPRESSION = re.compile(
     r"\$\{\{\s*"
     r"(?:github\.(?!sha\b|repository\b)|inputs\.|env\.|matrix\.)"
@@ -90,12 +101,89 @@ def _uses_environment(block: str, name: str) -> bool:
     )
 
 
+def _permission_mapping(lines: Sequence[str], index: int, indent: int) -> Dict[str, str]:
+    if lines[index].strip() != "permissions:":
+        raise ValueError("Permissions must use an explicit YAML mapping.")
+    result: Dict[str, str] = {}
+    cursor = index + 1
+    while cursor < len(lines):
+        line = lines[cursor]
+        stripped = line.strip()
+        current_indent = len(line) - len(line.lstrip())
+        if stripped and current_indent <= indent:
+            break
+        if not stripped or stripped.startswith("#"):
+            cursor += 1
+            continue
+        match = re.fullmatch(
+            r"\s{" + str(indent + 2) + r"}(?P<scope>[A-Za-z0-9_-]+):\s*(?P<level>read|write|none)\s*",
+            line,
+        )
+        if match is None or match.group("scope") in result:
+            raise ValueError("Permissions contain an unsupported or duplicate entry.")
+        result[match.group("scope")] = match.group("level")
+        cursor += 1
+    if not result:
+        raise ValueError("Permissions mappings must not be empty.")
+    return result
+
+
+def _effective_job_permissions(text: str) -> tuple[Dict[str, str], Dict[str, Dict[str, str]]]:
+    """Parse the constrained permissions/jobs subset used by repository workflows."""
+
+    lines = text.splitlines()
+    top_indices = [
+        index
+        for index, line in enumerate(lines)
+        if line == "permissions:"
+    ]
+    if len(top_indices) != 1:
+        raise ValueError("Workflow must declare exactly one top-level permissions mapping.")
+    top = _permission_mapping(lines, top_indices[0], 0)
+    jobs_indices = [index for index, line in enumerate(lines) if line == "jobs:"]
+    if len(jobs_indices) != 1:
+        raise ValueError("Workflow must declare exactly one jobs mapping.")
+    jobs: Dict[str, Dict[str, str]] = {}
+    index = jobs_indices[0] + 1
+    while index < len(lines):
+        line = lines[index]
+        if line.strip() and len(line) - len(line.lstrip()) == 0:
+            break
+        match = re.fullmatch(r"  (?P<job>[A-Za-z0-9_-]+):\s*", line)
+        if match is None:
+            index += 1
+            continue
+        job = match.group("job")
+        if job in jobs:
+            raise ValueError("Workflow job ids must be unique.")
+        end = index + 1
+        permission_indices = []
+        while end < len(lines):
+            candidate = lines[end]
+            if candidate.strip() and len(candidate) - len(candidate.lstrip()) <= 2:
+                break
+            if candidate == "    permissions:":
+                permission_indices.append(end)
+            end += 1
+        if len(permission_indices) > 1:
+            raise ValueError("Job must not declare multiple permissions mappings.")
+        jobs[job] = (
+            _permission_mapping(lines, permission_indices[0], 4)
+            if permission_indices
+            else dict(top)
+        )
+        index = end
+    if not jobs:
+        raise ValueError("Workflow must contain at least one statically named job.")
+    return top, jobs
+
+
 def audit_repository(root: Path) -> Dict[str, Any]:
     root = root.resolve(strict=True)
     policy = _load_json(root / "ci" / "allowed-actions.json")
     if policy.get("schema_version") != versioning.SCHEMA_VERSION:
         raise ValueError("CI action policy schema version is incompatible.")
-    if set(policy) != {"schema_version", "allowed_actions", "policy"}:
+    if set(policy) != {"schema_version", "allowed_actions", "allowed_docker_images", "policy"}:
         raise ValueError("CI action policy has unexpected or missing fields.")
     actions = policy.get("allowed_actions")
     if not isinstance(actions, list) or not actions or not all(
@@ -107,28 +195,55 @@ def audit_repository(root: Path) -> Dict[str, Any]:
     if len(actions) != len({item.lower() for item in actions}):
         raise ValueError("CI action policy has duplicate actions.")
     allowed = {item.lower() for item in actions}
+    images = policy.get("allowed_docker_images")
+    if (
+        not isinstance(images, list)
+        or len(images) != len({str(item).lower() for item in images})
+        or not all(
+            isinstance(item, str)
+            and re.fullmatch(r"[A-Za-z0-9._:/-]+", item)
+            for item in images
+        )
+    ):
+        raise ValueError("CI action policy has invalid allowed_docker_images.")
+    allowed_images = {item.lower() for item in images}
+    permission_policy = _load_json(root / "ci" / "workflow-permissions.json")
+    if (
+        permission_policy.get("schema_version") != versioning.SCHEMA_VERSION
+        or set(permission_policy) != {"schema_version", "policy", "workflows"}
+        or not isinstance(permission_policy.get("workflows"), dict)
+    ):
+        raise ValueError("CI workflow permission policy is invalid.")
     workflow_dir = root / ".github" / "workflows"
     workflows = sorted((*workflow_dir.glob("*.yml"), *workflow_dir.glob("*.yaml")))
     if not workflows:
         raise ValueError("No GitHub Actions workflows were found.")
 
     issues: list[str] = []
+    workflow_labels = {path.relative_to(root).as_posix() for path in workflows}
+    permission_labels = set(permission_policy["workflows"])
+    if permission_labels != workflow_labels:
+        issues.append("ci/workflow-permissions.json: workflow inventory is not exact")
     action_count = 0
+    image_count = 0
     pull_request_workflows = 0
     for path in workflows:
         text = safe_io.read_regular_file_at(
             root, path.relative_to(root), 512 * 1024
         ).decode("utf-8")
         label = path.relative_to(root).as_posix()
-        permission_match = re.search(
-            r"(?m)^permissions:\s*\n(?P<body>(?:  [A-Za-z0-9_-]+:\s*[A-Za-z-]+\s*\n?)+)",
-            text,
-        )
-        if (
-            permission_match is None
-            or permission_match.group("body").strip() != "contents: read"
-        ):
+        try:
+            top_permissions, effective_permissions = _effective_job_permissions(text)
+        except ValueError as exc:
+            issues.append(label + ": " + str(exc))
+            top_permissions, effective_permissions = {}, {}
+        if top_permissions != {"contents": "read"}:
             issues.append(label + ": top-level permissions are not exactly contents: read")
+        expected_permissions = permission_policy["workflows"].get(label)
+        if not isinstance(expected_permissions, dict):
+            issues.append(label + ": workflow is missing from the exact permission policy")
+        elif effective_permissions != expected_permissions:
+            issues.append(label + ": effective job permissions differ from the reviewed policy")
         run_blocks = _run_blocks(text)
         tainted_environment = _tainted_environment(text)
         if any(UNTRUSTED_EXPRESSION.search(block) for block in run_blocks):
@@ -157,7 +272,15 @@ def audit_repository(root: Path) -> Dict[str, Any]:
                 issues.append(label + ": pull-request workflow uses a self-hosted runner")
         for match in ACTION.finditer(text):
             value = match.group("value")
-            if value.startswith(("./", "docker://")):
+            if value.startswith("./"):
+                continue
+            if value.startswith("docker://"):
+                image_count += 1
+                immutable_image = IMMUTABLE_DOCKER.fullmatch(value)
+                if immutable_image is None:
+                    issues.append(label + ": mutable docker action reference " + value)
+                elif immutable_image.group("image").lower() not in allowed_images:
+                    issues.append(label + ": docker action image is not exactly allowlisted")
                 continue
             action_count += 1
             immutable = IMMUTABLE_ACTION.fullmatch(value)
@@ -170,6 +293,21 @@ def audit_repository(root: Path) -> Dict[str, Any]:
                 step_tail = text[match.end() : match.end() + 300]
                 if not re.search(r"(?m)^\s+persist-credentials:\s*false\s*$", step_tail):
                     issues.append(label + ": checkout does not disable persisted credentials")
+        docker_action_values = {
+            match.group("value")
+            for match in ACTION.finditer(text)
+            if match.group("value").startswith("docker://")
+        }
+        for match in CONTAINER_IMAGE.finditer(text):
+            value = match.group("value")
+            if value in docker_action_values:
+                continue
+            image_count += 1
+            immutable_image = IMMUTABLE_CONTAINER.fullmatch(value)
+            if immutable_image is None:
+                issues.append(label + ": mutable container or service image " + value)
+            elif immutable_image.group("image").lower() not in allowed_images:
+                issues.append(label + ": container or service image is not exactly allowlisted")
 
     release_path = workflow_dir / "release.yml"
     release = (
@@ -190,6 +328,14 @@ def audit_repository(root: Path) -> Dict[str, Any]:
         "gh_2.98.0_linux_amd64.tar.gz",
         "3b8ac6b30336802fc1a858d7c084e11cdf24ac1a761ca90b68022d7d729208de",
         "gh release verify",
+        "repos/$GITHUB_REPOSITORY/immutable-releases",
+        'test "$tag_commit" = "$(git rev-parse refs/remotes/origin/main)"',
+        "release-evidence.json",
+        "environment: release",
+        "timeout-minutes: 30",
+        "--signer-workflow",
+        "--source-digest",
+        "--deny-self-hosted-runners",
     )
     missing_release = [item for item in release_markers if item not in release]
     if missing_release:
@@ -210,7 +356,7 @@ def audit_repository(root: Path) -> Dict[str, Any]:
     topology_markers = (
         "uses: ./.github/workflows/security-proof.yml",
         "needs: proof",
-        "git merge-base --is-ancestor",
+        'test "$tag_commit" = "$(git rev-parse refs/remotes/origin/main)"',
         "gh attestation verify",
     )
     if any(item not in release for item in topology_markers):
@@ -238,11 +384,12 @@ def audit_repository(root: Path) -> Dict[str, Any]:
         "status": "pass" if not issues else "fail",
         "workflow_count": len(workflows),
         "action_count": action_count,
+        "image_count": image_count,
         "pull_request_workflow_count": pull_request_workflows,
         "issues": issues,
         "evidence_refs": {
-            "action_policy": "ci-audit:immutable-actions-and-exact-allowlist",
-            "token_policy": "ci-audit:explicit-workflow-permissions",
+            "action_policy": "ci-audit:immutable-actions-images-and-exact-allowlist",
+            "token_policy": "ci-audit:exact-effective-job-permissions",
             "pr_policy": "ci-audit:pull-request-secret-and-runner-isolation",
             "injection_policy": "ci-audit:expression-env-and-shell-code-boundary",
             "provenance_policy": "ci-audit:configured-release-verification-boundary",
@@ -258,8 +405,8 @@ def build_evidence(profile: Mapping[str, Any], audit: Mapping[str, Any]) -> Dict
         raise ValueError("CI audit failed; verified evidence cannot be emitted.")
     refs = audit["evidence_refs"]
     rows = (
-        ("CICD-ACTION-001", "verified", refs["action_policy"], "All external Action references are immutable and exactly allowlisted."),
-        ("CICD-TOKEN-001", "verified", refs["token_policy"], "Every workflow has an explicit read-only token baseline and elevated release permissions are job-local."),
+        ("CICD-ACTION-001", "verified", refs["action_policy"], "All external Actions and Docker action/container/service images are immutable and exactly allowlisted."),
+        ("CICD-TOKEN-001", "verified", refs["token_policy"], "Every job's effective token permissions exactly match the reviewed least-privilege policy."),
         ("CICD-PR-001", "verified", refs["pr_policy"], "Pull-request workflows expose neither secret references nor self-hosted runners and checkout credentials are not persisted."),
         ("CICD-INJECT-001", "verified", refs["injection_policy"], "Supported workflow shell flows contain no direct untrusted expressions, expression-tainted environment use, or dynamic shell-code execution sinks."),
         ("CICD-PROV-001", "unknown", refs["provenance_policy"], "The workflow configures reproducible archives, checksums, attestations, and draft-asset re-verification; successful provenance for a particular release is established only by that release run."),

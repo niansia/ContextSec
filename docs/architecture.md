@@ -8,7 +8,7 @@ ContextSec is an applicability layer for product security decisions. It is not a
 bounded repository files
         |
         v
-deterministic observations ---- caller-supplied declarations
+clean Git source identity ---- deterministic observations ---- caller-supplied declarations
         |                                  |
         +--------------+-------------------+
                        v
@@ -36,6 +36,14 @@ deterministic observations ---- caller-supplied declarations
 ```
 
 For the published support matrix, a separate deterministic checker consumes the profile and emits narrow `failed` or `unknown` control evidence. The ledger then enumerates every applicable catalog control. It never treats an unreported pattern as `verified`.
+
+Tool, detector, checker, and artifact-schema versions advance independently. Dependency-aware semantic digests bind the executable symbols and data contracts that affect each model while ignoring comments and formatting, so harmless source edits do not invalidate evidence and behavior changes cannot hide behind an unchanged marketing version.
+
+## Source and component identity
+
+A single-repository Profile records a canonical Git origin, full commit, and worktree state. `verified` means all three are available and the worktree is clean; `dirty` and `unavailable` remain explicit. This is local source provenance, not a cryptographic signature.
+
+For monorepos, an explicit component model declares non-overlapping repository-relative roots, component kinds, acyclic dependencies, and evidence-referenced cross-component flows. ContextSec profiles each component root independently while binding every child Profile to the repository's common Git identity. The aggregate component artifact binds the model digest and child Profile digests. Co-location never proves a cross-component flow.
 
 ## Trust classes
 
@@ -82,7 +90,13 @@ When every pack in a composition is active, the derived control is emitted as a 
 
 Each active-pack control and active composition becomes exactly one ledger row. `applicability` (`required`, `candidate`, `not_applicable`, `unknown`) and `verification` (`verified`, `failed`, `unknown`, `waived`) are independent dimensions. Catalog `applies_when` rules use detected sub-capabilities to avoid irrelevant blockers. Findings force applicability to `required`; a `failed` deterministic finding cannot be overridden by a supplied `verified` assertion. `verified` and `failed` require evidence references. Waivers require owner, reason, compensating control, expiry, and an explicit deterministic `as-of` date. The ledger records that date, while validation of any waiver-bearing artifact requires the intended release date as an external input to prevent replay.
 
-The profiler runs once per repository evaluation. Its `subject_revision`, repository label, artifact options, traversal coverage, stack support, and active packs must match the checker artifact before the ledger accepts it. Routing, detector, checker, catalog, composition, and support-matrix digests are bound separately. Profile and finding IDs, location IDs, evidence IDs, and fingerprints are recomputed for internal consistency.
+The profiler runs once per repository evaluation. Its `subject_revision`, repository label, source provenance, optional component identity, artifact options, traversal coverage, stack support, and active packs must match the checker artifact before the ledger accepts it. Routing, detector, checker, catalog, composition, and support-matrix digests are bound separately. Profile and finding IDs, location IDs, evidence IDs, and fingerprints are recomputed for internal consistency.
+
+## Verification coverage and signed evaluation
+
+The coverage registry enumerates every catalog control and composition as `automated` or `evidence-required`, with named automated methods. It reports method availability only. Per-repository verification still comes from bound checker/policy findings or supplied evidence and defaults to `unknown`.
+
+External review labels never supply support class; it is derived from each matching Profile. A holdout result is publishable only after the label and prediction files pass signer-workflow-constrained online artifact-attestation verification and trusted timestamps prove labels predate predictions. Explicitly allowed unsigned runs remain development-only. Release evidence uses the same fail-closed pattern: exact `main` commit, full CI proof, immutable-release precondition, model identities, coverage digest, and archive digest are emitted together and covered by source-commit- and signer-constrained attestations before publication.
 
 ## Deterministic-core invariants
 

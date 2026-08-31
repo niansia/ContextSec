@@ -75,10 +75,13 @@ def validate(profile: Mapping[str, Any]) -> List[str]:
             subject,
             {
                 "repository",
+                "source_provenance",
+                "component",
                 "subject_revision",
                 "source_inventory_digest",
                 "decision_model_digest",
                 "routing_model_digest",
+                "detector_version",
                 "detector_model_digest",
                 "catalog_digest",
                 "composition_digest",
@@ -107,6 +110,7 @@ def validate(profile: Mapping[str, Any]) -> List[str]:
             errors,
         )
         for field, expected in (
+            ("detector_version", profile_repo.DETECTOR_VERSION),
             ("routing_model_digest", profile_repo.ROUTING_MODEL_DIGEST),
             ("detector_model_digest", profile_repo.DETECTOR_MODEL_DIGEST),
             ("catalog_digest", profile_repo.CATALOG_DIGEST),
@@ -116,6 +120,68 @@ def validate(profile: Mapping[str, Any]) -> List[str]:
             require(
                 subject.get(field) == expected,
                 "subject." + field + " does not match the active model",
+                errors,
+            )
+        provenance = subject.get("source_provenance")
+        require(
+            isinstance(provenance, dict),
+            "subject.source_provenance must be an object",
+            errors,
+        )
+        if isinstance(provenance, dict):
+            exact_keys(
+                provenance,
+                {"status", "vcs", "repository", "commit", "worktree"},
+                "subject.source_provenance",
+                errors,
+            )
+            verified = provenance.get("status") == "verified"
+            require(
+                provenance.get("status") in {"verified", "dirty", "unavailable"},
+                "subject.source_provenance.status is invalid",
+                errors,
+            )
+            require(
+                (not verified)
+                or (
+                    provenance.get("vcs") == "git"
+                    and provenance.get("worktree") == "clean"
+                    and bool(
+                        re.fullmatch(
+                            r"https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+",
+                            str(provenance.get("repository", "")),
+                        )
+                    )
+                    and bool(
+                        re.fullmatch(
+                            r"[a-f0-9]{40}", str(provenance.get("commit", ""))
+                        )
+                    )
+                ),
+                "verified source provenance requires a canonical repository and full commit",
+                errors,
+            )
+        component = subject.get("component")
+        require(
+            component is None or isinstance(component, dict),
+            "subject.component must be null or an object",
+            errors,
+        )
+        if isinstance(component, dict):
+            exact_keys(
+                component,
+                {"id", "root", "path_identity"},
+                "subject.component",
+                errors,
+            )
+            require(
+                bool(re.fullmatch(r"[a-z][a-z0-9_-]{0,63}", str(component.get("id", "")))),
+                "subject.component.id is invalid",
+                errors,
+            )
+            require(
+                bool(re.fullmatch(r"sha256:[a-f0-9]{64}", str(component.get("path_identity", "")))),
+                "subject.component.path_identity is invalid",
                 errors,
             )
         require(
