@@ -1,5 +1,9 @@
 {
-  "schema_version": "0.3.1",
-  "allowed_owners": ["actions", "github"],
-  "policy": "Every non-local GitHub Action must use a full 40- or 64-character hexadecimal revision and an explicitly allowed owner."
+  "schema_version": "0.3.2",
+  "allowed_actions": [
+    "actions/attest-build-provenance",
+    "actions/checkout",
+    "actions/setup-python"
+  ],
+  "policy": "Every non-local GitHub Action must be named explicitly here and use a full 40- or 64-character hexadecimal revision."
 }

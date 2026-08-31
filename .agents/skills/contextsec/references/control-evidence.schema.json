@@ -1,11 +1,11 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/niansia/ContextSec/v0.3.1/.agents/skills/contextsec/references/control-evidence.schema.json",
+  "$id": "https://raw.githubusercontent.com/niansia/ContextSec/v0.3.2/.agents/skills/contextsec/references/control-evidence.schema.json",
   "title": "ContextSec supplied control evidence and waivers",
   "type": "object",
   "required": ["schema_version", "subject_revision", "controls", "waivers"],
   "properties": {
-    "schema_version": {"const": "0.3.1"},
+    "schema_version": {"const": "0.3.2"},
     "subject_revision": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
     "controls": {
       "type": "array",

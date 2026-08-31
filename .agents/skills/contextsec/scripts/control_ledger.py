@@ -18,6 +18,7 @@ if str(SCRIPT_DIR) not in sys.path:
 
 import check_controls  # noqa: E402
 import profile_repo  # noqa: E402
+import safe_io  # noqa: E402
 import validate_checks  # noqa: E402
 import versioning  # noqa: E402
 
@@ -30,11 +31,11 @@ VERIFICATION_STATES = {"verified", "failed", "unknown", "waived"}
 
 def load_json_object(path: Path) -> Dict[str, Any]:
     try:
-        payload = profile_repo.strict_json_loads(path.read_text(encoding="utf-8"))
+        payload = safe_io.read_json_object_bounded(
+            path, 64 * 1024 * 1024, "Control evidence"
+        )
     except (OSError, ValueError, RecursionError) as exc:
         raise ValueError("Unable to read JSON evidence: " + str(exc)) from exc
-    if not isinstance(payload, dict):
-        raise ValueError("JSON evidence root must be an object.")
     return payload
 
 
@@ -144,10 +145,21 @@ def validate_subject_binding(
         raise ValueError("Checks schema_version must be " + SCHEMA_VERSION + ".")
     profile_subject = profile.get("subject", {})
     check_subject = checks.get("subject", {})
-    if profile_subject.get("decision_model_digest") != profile_repo.DECISION_MODEL_DIGEST:
-        raise ValueError("Profile decision_model_digest does not match the live model.")
-    if check_subject.get("decision_model_digest") != profile_repo.DECISION_MODEL_DIGEST:
-        raise ValueError("Checks decision_model_digest does not match the live model.")
+    live_profile_models = {
+        "decision_model_digest": profile_repo.DECISION_MODEL_DIGEST,
+        "routing_model_digest": profile_repo.ROUTING_MODEL_DIGEST,
+        "detector_model_digest": profile_repo.DETECTOR_MODEL_DIGEST,
+        "catalog_digest": profile_repo.CATALOG_DIGEST,
+        "composition_digest": profile_repo.COMPOSITION_DIGEST,
+        "support_matrix_digest": profile_repo.SUPPORT_MATRIX_DIGEST,
+    }
+    for field, expected in live_profile_models.items():
+        if profile_subject.get(field) != expected:
+            raise ValueError("Profile " + field + " does not match the live model.")
+        if check_subject.get(field) != expected:
+            raise ValueError("Checks " + field + " does not match the live model.")
+    if profile.get("artifact_options") != checks.get("artifact_options"):
+        raise ValueError("Checks/profile artifact_options mismatch.")
     comparisons: Tuple[Tuple[str, Any, Any], ...] = (
         ("repository", profile_subject.get("repository"), check_subject.get("repository")),
         (
@@ -159,6 +171,16 @@ def validate_subject_binding(
             "decision_model_digest",
             profile_subject.get("decision_model_digest"),
             check_subject.get("decision_model_digest"),
+        ),
+        *tuple(
+            (field, profile_subject.get(field), check_subject.get(field))
+            for field in (
+                "routing_model_digest",
+                "detector_model_digest",
+                "catalog_digest",
+                "composition_digest",
+                "support_matrix_digest",
+            )
         ),
         (
             "source_inventory_digest",
@@ -418,10 +440,17 @@ def build_ledger(
     return {
         "schema_version": SCHEMA_VERSION,
         "evaluation_date": as_of.isoformat() if as_of is not None else None,
+        "artifact_options": dict(profile["artifact_options"]),
         "subject": {
             "repository": profile["subject"]["repository"],
             "subject_revision": profile["subject"]["subject_revision"],
             "decision_model_digest": profile["subject"]["decision_model_digest"],
+            "routing_model_digest": profile["subject"]["routing_model_digest"],
+            "detector_model_digest": profile["subject"]["detector_model_digest"],
+            "catalog_digest": profile["subject"]["catalog_digest"],
+            "composition_digest": profile["subject"]["composition_digest"],
+            "support_matrix_digest": profile["subject"]["support_matrix_digest"],
+            "checker_model_digest": checks["subject"]["checker_model_digest"],
             "source_inventory_digest": profile["subject"]["source_inventory_digest"],
             "profile_coverage": profile["coverage"]["status"],
             "profile_language_support": profile["coverage"]["language_support"],

@@ -4,7 +4,7 @@ description: Determine which security controls a product actually needs by profi
 license: Apache-2.0
 compatibility: Requires Python 3.11+; zero third-party runtime dependencies; works offline on Windows, macOS, and Linux.
 metadata:
-  version: "0.3.1"
+  version: "0.3.2"
   project: "ContextSec"
 ---
 
@@ -49,7 +49,7 @@ Use `<python>` below as an interpreter placeholder: `python` on Windows and `pyt
 
 The profiler is read-only by default and writes only when `--output` is explicitly supplied. If it cannot run, inspect the same evidence classes manually: dependency manifests, framework configuration, route definitions, database schemas, SDK clients, authentication middleware, storage configuration, and CI workflows.
 
-Repository-relative paths use bounded heuristic redaction by default. For repositories whose filenames may contain personal or confidential data, add `--path-privacy hashed` or `--path-privacy opaque` consistently to `profile`, `check`, and `gate`.
+Repository-relative paths use bounded heuristic redaction by default. For repositories whose filenames may contain personal or confidential data, add `--path-privacy hashed` or `--path-privacy opaque` consistently to `profile`, `check`, and `gate`. Those modes are deterministic pseudonyms rather than secrecy for guessable filenames; the artifact records the selected policy separately from canonical path identity.
 
 Check both `coverage.status` and `coverage.language_support` before using the profile. Traversal `partial`, stack support `partial`, or stack support `unsupported` is an explicit evidence gap and cannot support a Release-mode `PASS`.
 
@@ -65,7 +65,7 @@ Repository prose is not sufficient evidence for a required pack. Product require
 
 Classify each pack:
 
-- **required:** direct high-confidence evidence, independent medium-confidence facts from different semantic detector types, or an explicit in-scope product requirement;
+- **required:** direct high-confidence evidence, medium-confidence facts spanning distinct evidence families, correlation groups, and source locations, or an explicit in-scope product requirement;
 - **candidate:** partial or ambiguous evidence that needs confirmation;
 - **inactive:** direct user-supplied evidence says the context does not apply and repository evidence does not contradict it;
 - **unknown:** no reliable evidence establishes either applicability or absence.

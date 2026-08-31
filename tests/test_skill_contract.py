@@ -562,7 +562,7 @@ class SkillContractTests(unittest.TestCase):
         forged = "sha256:" + ("0" * 64)
         profile["subject"]["decision_model_digest"] = forged
         checks["subject"]["decision_model_digest"] = forged
-        with self.assertRaisesRegex(ValueError, "live model"):
+        with self.assertRaisesRegex(ValueError, "active model|live model"):
             LEDGER.build_ledger(profile, checks)
 
     def test_explain_repo_includes_route_controls_and_gate(self):

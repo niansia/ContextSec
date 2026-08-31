@@ -42,7 +42,9 @@ def load_pack_catalog(path: Path = CATALOG_PATH) -> Dict[str, Any]:
     """Load the sole machine-readable source for pack order and dependencies."""
 
     try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
+        payload = safe_io.read_json_object_bounded(
+            path, 4 * 1024 * 1024, "Pack catalog"
+        )
     except (OSError, ValueError, RecursionError) as exc:
         raise RuntimeError("Unable to load ContextSec pack catalog: " + str(exc)) from exc
     packs = payload.get("packs") if isinstance(payload, dict) else None
@@ -91,8 +93,8 @@ def load_pack_catalog(path: Path = CATALOG_PATH) -> Dict[str, Any]:
 
 PACK_CATALOG = load_pack_catalog()
 try:
-    COMPOSITION_CATALOG = json.loads(
-        COMPOSITION_CATALOG_PATH.read_text(encoding="utf-8")
+    COMPOSITION_CATALOG = safe_io.read_json_object_bounded(
+        COMPOSITION_CATALOG_PATH, 4 * 1024 * 1024, "Composition catalog"
     )
 except (OSError, ValueError, RecursionError) as exc:
     raise RuntimeError(
@@ -105,20 +107,47 @@ if COMPOSITION_CATALOG.get("schema_version") != SCHEMA_VERSION or not isinstance
 for composition in COMPOSITION_CATALOG["rules"]:
     if not isinstance(composition, dict) or type(composition.get("blocking")) is not bool:
         raise RuntimeError("ContextSec composition blocking fields must be JSON booleans.")
-def decision_model_digest() -> str:
-    return (
-        "sha256:"
-        + hashlib.sha256(
-            json.dumps(
-                {"packs": PACK_CATALOG, "compositions": COMPOSITION_CATALOG},
-                sort_keys=True,
-                separators=(",", ":"),
-            ).encode("utf-8")
-        ).hexdigest()
+
+
+def canonical_digest(value: Any) -> str:
+    return "sha256:" + hashlib.sha256(
+        json.dumps(value, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+
+
+def detector_model_digest() -> str:
+    """Digest the live detector implementation without trusting import-time state."""
+
+    return "sha256:" + hashlib.sha256(
+        safe_io.read_regular_file(Path(__file__), 4 * 1024 * 1024)
+    ).hexdigest()
+
+
+def routing_model_digest() -> str:
+    """Digest every input that can change routing or applicability decisions."""
+
+    return canonical_digest(
+        {
+            "detector_model_digest": detector_model_digest(),
+            "catalog_digest": canonical_digest(PACK_CATALOG),
+            "composition_digest": canonical_digest(COMPOSITION_CATALOG),
+            "support_matrix_digest": canonical_digest(support_matrix.SUPPORT_MATRIX),
+        }
     )
 
 
-DECISION_MODEL_DIGEST = decision_model_digest()
+def decision_model_digest() -> str:
+    """Backward-compatible name for the complete routing model digest."""
+
+    return routing_model_digest()
+
+
+CATALOG_DIGEST = canonical_digest(PACK_CATALOG)
+COMPOSITION_DIGEST = canonical_digest(COMPOSITION_CATALOG)
+SUPPORT_MATRIX_DIGEST = canonical_digest(support_matrix.SUPPORT_MATRIX)
+DETECTOR_MODEL_DIGEST = detector_model_digest()
+ROUTING_MODEL_DIGEST = routing_model_digest()
+DECISION_MODEL_DIGEST = ROUTING_MODEL_DIGEST
 PACK_ORDER = tuple(item["id"] for item in PACK_CATALOG["packs"])
 PACK_CLAIMS = {
     item["id"]: item["claim"]
@@ -1195,6 +1224,56 @@ def sha256_text(value: str) -> str:
     )
 
 
+def path_identity(value: str) -> str:
+    """Return the canonical identity for a raw repository-relative path."""
+
+    return sha256_text("path\x1f" + value.replace("\\", "/"))
+
+
+def evidence_semantics(detector_id: str, kind: str, pack: str) -> Tuple[str, str]:
+    """Classify independence without treating correlated SDK signals as separate facts."""
+
+    if kind == "dependency":
+        return ("dependency_manifest", "sdk:" + pack)
+    if kind == "import":
+        return ("sdk_import", "sdk:" + pack)
+    family_by_kind = {
+        "route": "interface",
+        "schema-field": "data_model",
+        "data-shape": "data_model",
+        "tenant-boundary": "authorization_boundary",
+        "webhook": "interface",
+        "model-call": "runtime_callsite",
+        "outbound-call": "runtime_callsite",
+        "value-transfer": "runtime_callsite",
+        "upload": "runtime_callsite",
+        "feature": "capability_marker",
+    }
+    family = family_by_kind.get(kind, kind.replace("-", "_"))
+    return (family, detector_id)
+
+
+def detector_contracts() -> Dict[str, set[Tuple[str, str, str, str]]]:
+    """Return every accepted contract for each stable detector identifier."""
+
+    contracts: Dict[str, set[Tuple[str, str, str, str]]] = {}
+    for detector_id, pack, claim, confidence in (
+        *NODE_DEPENDENCY_DETECTORS.values(),
+        *PYTHON_DEPENDENCY_DETECTORS.values(),
+    ):
+        contract = (pack, claim, "dependency", confidence)
+        contracts.setdefault(detector_id, set()).add(contract)
+    for detector in TEXT_DETECTORS:
+        contract = (
+            detector.pack,
+            detector.claim,
+            detector.kind,
+            detector.confidence,
+        )
+        contracts.setdefault(detector.detector_id, set()).add(contract)
+    return contracts
+
+
 def redact_path(value: str, mode: str = "heuristic") -> str:
     if mode not in PATH_PRIVACY_MODES:
         raise ValueError("Unsupported path privacy mode: " + mode)
@@ -1226,7 +1305,7 @@ def reject_duplicate_keys(pairs: Sequence[Tuple[str, Any]]) -> Dict[str, Any]:
 
 
 def strict_json_loads(text: str) -> Any:
-    return json.loads(text, object_pairs_hook=reject_duplicate_keys)
+    return safe_io.strict_json_loads(text)
 
 
 def classify_scope(relative: Path) -> str:
@@ -1333,17 +1412,26 @@ def make_observation(
     path_privacy: str = "heuristic",
 ) -> Dict[str, Any]:
     safe_path = redact_path(relative, path_privacy)
+    canonical_path = path_identity(relative)
     evidence_id = sha256_text(
-        "evidence\x1f" + "\x1f".join((safe_path, locator, detector_id, DETECTOR_VERSION))
+        "evidence\x1f"
+        + "\x1f".join(
+            (canonical_path, locator, detector_id, DETECTOR_MODEL_DIGEST)
+        )
     )
-    location_id = sha256_text("location\x1f" + "\x1f".join((safe_path, locator)))
+    location_id = sha256_text(
+        "location\x1f" + "\x1f".join((canonical_path, locator))
+    )
     fingerprint = sha256_text(
         "fingerprint\x1f" + "\x1f".join((evidence_id, content_digest))
     )
-    observation_id = "obs-" + evidence_id.removeprefix("sha256:")[:12]
+    observation_id = "obs-" + evidence_id.removeprefix("sha256:")
+    evidence_family, correlation_group = evidence_semantics(detector_id, kind, pack)
     return {
         "id": observation_id,
         "kind": kind,
+        "evidence_family": evidence_family,
+        "correlation_group": correlation_group,
         "pack": pack,
         "claim": claim,
         "scope": scope,
@@ -1351,6 +1439,7 @@ def make_observation(
         "detector": {"id": detector_id, "version": DETECTOR_VERSION},
         "evidence": {
             "path": safe_path,
+            "path_identity": canonical_path,
             "locator": locator,
             "evidence_id": evidence_id,
             "location_id": location_id,
@@ -1468,6 +1557,31 @@ def python_dependency_specs(relative: str, text: str) -> List[str]:
             if isinstance(key, str) and key.lower() != "python"
         )
     return specs
+
+
+def python_manifest_indirections(relative: str, text: str) -> List[str]:
+    """Return unsupported production dependency indirections, without resolving them."""
+
+    if Path(relative).name.lower() not in {"requirements.txt", "requirements.in"}:
+        return []
+    directives: List[str] = []
+    for line in text.splitlines():
+        candidate = _strip_manifest_comment(line).strip()
+        lowered = candidate.lower()
+        if not candidate:
+            continue
+        if lowered.startswith(("-r", "--requirement", "-e", "--editable")):
+            directives.append(candidate.split(maxsplit=1)[0])
+            continue
+        if lowered.startswith(("git+", "hg+", "svn+", "bzr+", "file:", "./", "../", "/")):
+            directives.append(candidate.split(maxsplit=1)[0])
+            continue
+        if re.search(
+            r"\s@\s*(?:git\+|hg\+|svn\+|bzr\+|https?://|file:|\.{1,2}/|/)",
+            lowered,
+        ):
+            directives.append("direct-reference")
+    return directives
 
 
 def inspect_python_manifest(
@@ -2008,8 +2122,9 @@ def load_declarations(path: Optional[Path]) -> Dict[str, bool]:
     if path is None:
         return {}
     try:
-        raw = safe_io.read_regular_file(path, MAX_CONTEXT_BYTES)
-        payload = strict_json_loads(raw.decode("utf-8-sig"))
+        payload = safe_io.read_json_object_bounded(
+            path, MAX_CONTEXT_BYTES, "Context declaration"
+        )
     except safe_io.FileSizeLimitError as exc:
         raise ValueError("Context declaration exceeds the 64 KiB input limit.") from exc
     except (OSError, ValueError, RecursionError) as exc:
@@ -2035,9 +2150,16 @@ def confidence_for(observations: Sequence[Mapping[str, Any]]) -> str:
     levels = [item["confidence"] for item in observations]
     if "high" in levels:
         return "high"
-    independent_detectors = {item["detector"]["id"] for item in observations}
-    independent_kinds = {item["kind"] for item in observations}
-    if len(independent_detectors) >= 2 and len(independent_kinds) >= 2:
+    independent_families = {item["evidence_family"] for item in observations}
+    correlation_groups = {item["correlation_group"] for item in observations}
+    independent_locations = {
+        item["evidence"]["location_id"] for item in observations
+    }
+    if (
+        len(independent_families) >= 2
+        and len(correlation_groups) >= 2
+        and len(independent_locations) >= 2
+    ):
         return "high"
     if "medium" in levels:
         return "medium"
@@ -2250,6 +2372,7 @@ def profile_repository(
         "binary": 0,
         "invalid_encoding": 0,
         "invalid_manifest": 0,
+        "unsupported_manifest_indirection": 0,
     }
     partial = False
     walk_stats = WalkStats()
@@ -2291,8 +2414,8 @@ def profile_repository(
             )
             break
         try:
-            raw = safe_io.read_regular_file(
-                path, min(max_file_bytes, remaining_total)
+            raw = safe_io.read_regular_file_at(
+                root, relative_path, min(max_file_bytes, remaining_total)
             )
         except safe_io.FileSizeLimitError as exc:
             files_skipped += 1
@@ -2356,6 +2479,17 @@ def profile_repository(
             inspect_package_json(relative, evidence_text, scope, path_privacy)
         )
         try:
+            indirections = python_manifest_indirections(relative, evidence_text)
+            if indirections:
+                partial = True
+                skip_counts["unsupported_manifest_indirection"] += 1
+                limitation = (
+                    "At least one production dependency manifest contains unsupported "
+                    "requirement, editable, VCS, or local-path indirection; dependency "
+                    "evidence is incomplete."
+                )
+                if limitation not in limitations:
+                    limitations.append(limitation)
             observations.extend(
                 inspect_python_manifest(relative, evidence_text, scope, path_privacy)
             )
@@ -2413,6 +2547,7 @@ def profile_repository(
     scope_material = [
         "schema=" + SCHEMA_VERSION,
         "detector=" + DETECTOR_VERSION,
+        "detector-model=" + DETECTOR_MODEL_DIGEST,
         "decision-model=" + DECISION_MODEL_DIGEST,
         "declarations="
         + json.dumps(declarations, sort_keys=True, separators=(",", ":")),
@@ -2445,11 +2580,17 @@ def profile_repository(
         observation["evidence"]["subject_revision"] = subject_revision
     return {
         "schema_version": SCHEMA_VERSION,
+        "artifact_options": {"path_privacy": path_privacy},
         "subject": {
             "repository": redact_path(root.name, path_privacy),
             "subject_revision": subject_revision,
             "source_inventory_digest": source_inventory_digest,
             "decision_model_digest": DECISION_MODEL_DIGEST,
+            "routing_model_digest": ROUTING_MODEL_DIGEST,
+            "detector_model_digest": DETECTOR_MODEL_DIGEST,
+            "catalog_digest": CATALOG_DIGEST,
+            "composition_digest": COMPOSITION_DIGEST,
+            "support_matrix_digest": SUPPORT_MATRIX_DIGEST,
             "files_scanned": files_scanned,
             "files_skipped": files_skipped,
             "bytes_scanned": bytes_scanned,

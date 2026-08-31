@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/niansia/ContextSec/v0.3.2/.agents/skills/contextsec/references/support-matrix.schema.json",
+  "title": "ContextSec Support Matrix",
+  "type": "object",
+  "required": ["$schema", "$id", "schema_version", "profile", "checker", "coverage_semantics"],
+  "properties": {
+    "$schema": {"const": "https://json-schema.org/draft/2020-12/schema"},
+    "$id": {"const": "https://raw.githubusercontent.com/niansia/ContextSec/v0.3.2/.agents/skills/contextsec/references/support-matrix.json"},
+    "schema_version": {"const": "0.3.2"},
+    "profile": {
+      "type": "object",
+      "required": ["supported_manifests", "unsupported_manifests", "supported_suffixes", "unsupported_suffixes", "frameworks"],
+      "properties": {
+        "supported_manifests": {"$ref": "#/$defs/nonemptyUniqueStrings"},
+        "unsupported_manifests": {"$ref": "#/$defs/nonemptyUniqueStrings"},
+        "supported_suffixes": {"$ref": "#/$defs/nonemptyUniqueStrings"},
+        "unsupported_suffixes": {"$ref": "#/$defs/nonemptyUniqueStrings"},
+        "frameworks": {"$ref": "#/$defs/nonemptyUniqueStrings"}
+      },
+      "additionalProperties": false
+    },
+    "checker": {
+      "type": "object",
+      "required": ["supported_suffixes", "unsupported_suffixes", "frameworks", "control_shapes"],
+      "properties": {
+        "supported_suffixes": {"$ref": "#/$defs/nonemptyUniqueStrings"},
+        "unsupported_suffixes": {"$ref": "#/$defs/nonemptyUniqueStrings"},
+        "frameworks": {"$ref": "#/$defs/nonemptyUniqueStrings"},
+        "control_shapes": {"$ref": "#/$defs/nonemptyUniqueStrings"}
+      },
+      "additionalProperties": false
+    },
+    "coverage_semantics": {
+      "type": "object",
+      "required": ["traversal", "language_support", "checker_support", "match_enumeration"],
+      "properties": {
+        "traversal": {"const": ["complete", "partial"]},
+        "language_support": {"const": ["supported", "partial", "unsupported"]},
+        "checker_support": {"const": "partial"},
+        "match_enumeration": {"const": "mixed_first_only"}
+      },
+      "additionalProperties": false
+    }
+  },
+  "$defs": {
+    "nonemptyUniqueStrings": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1},
+      "minItems": 1,
+      "uniqueItems": true
+    }
+  },
+  "additionalProperties": false
+}

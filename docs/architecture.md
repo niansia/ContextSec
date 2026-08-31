@@ -48,13 +48,13 @@ For the published support matrix, a separate deterministic checker consumes the 
 
 Each observation contains:
 
-- a stable observation and `evidence_id` derived from detector, path, locator, and detector version;
-- a kind, target claim, pack, production scope, and confidence;
+- a full stable observation and `evidence_id` derived from detector, canonical path identity, locator, and detector-model digest;
+- a kind, target claim, pack, production scope, confidence, evidence family, and correlation group;
 - detector ID and version;
-- repository-relative path and locator;
+- a display-policy repository-relative path, separate full `path_identity`, and locator;
 - a stable `location_id`, whole-file `content_digest`, content-bound `fingerprint`, and profile `subject_revision`.
 
-The stable IDs support comparison; the digest/fingerprint detect source change. Hashes are integrity identifiers, not secrecy. The artifact does not contain matched source text, source-content values, environment contents, or absolute local paths. `.env`-family files are reduced to key names before content hashing or observation generation; values never become evidence material. Repository-relative filenames use bounded heuristic redaction by default, so filenames can still carry personal data; `hashed` and `opaque` path modes remove those names from Profile, Checks, and Ledger artifacts.
+The full IDs support comparison; the digest/fingerprint detect source change. Hashes are integrity identifiers, not secrecy. The artifact does not contain matched source text, source-content values, environment contents, or absolute local paths. `.env`-family files are reduced to key names before content hashing or observation generation; values never become evidence material. Repository-relative filenames use bounded heuristic redaction by default, so filenames can still carry personal data. `hashed` and `opaque` remove direct text but remain guessable deterministic pseudonyms for low-entropy paths. `artifact_options.path_privacy` declares the policy, while canonical path identity remains independent of display.
 
 ## Claim semantics
 
@@ -63,7 +63,7 @@ The stable IDs support comparison; the digest/fingerprint detect source change. 
 - `unknown`: the bounded scan did not establish presence or absence.
 - `contradicted`: a declaration conflicts with observed production evidence.
 
-Inference confidence describes the evidence behind a claim. It is never a risk or assurance score.
+Inference confidence describes the evidence behind a claim. Medium signals become high only across distinct evidence families, correlation groups, and source locations; a dependency plus an import of the same SDK stays correlated. Confidence is never a risk or assurance score.
 
 ## Routing semantics
 
@@ -82,7 +82,7 @@ When every pack in a composition is active, the derived control is emitted as a 
 
 Each active-pack control and active composition becomes exactly one ledger row. `applicability` (`required`, `candidate`, `not_applicable`, `unknown`) and `verification` (`verified`, `failed`, `unknown`, `waived`) are independent dimensions. Catalog `applies_when` rules use detected sub-capabilities to avoid irrelevant blockers. Findings force applicability to `required`; a `failed` deterministic finding cannot be overridden by a supplied `verified` assertion. `verified` and `failed` require evidence references. Waivers require owner, reason, compensating control, expiry, and an explicit deterministic `as-of` date. The ledger records that date, while validation of any waiver-bearing artifact requires the intended release date as an external input to prevent replay.
 
-The profiler runs once per repository evaluation. Its `subject_revision`, repository label, decision-model digest, traversal coverage, stack support, and active packs must match the checker artifact before the ledger accepts it. The artifact decision-model digest must also equal the live catalog digest; finding IDs, location IDs, evidence IDs, and fingerprints are recomputed for internal consistency.
+The profiler runs once per repository evaluation. Its `subject_revision`, repository label, artifact options, traversal coverage, stack support, and active packs must match the checker artifact before the ledger accepts it. Routing, detector, checker, catalog, composition, and support-matrix digests are bound separately. Profile and finding IDs, location IDs, evidence IDs, and fingerprints are recomputed for internal consistency.
 
 ## Deterministic-core invariants
 

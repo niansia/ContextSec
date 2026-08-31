@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.3.2 — Evidence identity hardening
+
+- Anchored POSIX repository traversal to directory descriptors, added Windows reparse/final-handle containment checks, and routed untrusted JSON artifacts through one bounded, duplicate-key-rejecting reader.
+- Split display-path privacy from canonical path identity, expanded observation and finding IDs to full SHA-256 width, added explicit artifact privacy metadata, and made semantic validators recompute evidence identities.
+- Added evidence families and correlation groups so dependency/import signals from the same SDK do not become independent high-confidence proof.
+- Bound routing, detector, checker, catalog, composition, and support-matrix digests separately across Profile, Checks, Ledger, `doctor`, and external predictions.
+- Made unsupported requirements indirection an explicit partial-coverage gap and added identity/forgery/indirection regression contracts.
+- Made `benchmark --suite all` include the adversarial suite and added public CLI contracts for version, doctor, external review, and holdout evaluation.
+- Replaced owner-level Action trust with an exact action allowlist and expanded CI audit coverage across expression-tainted environment variables, `github.ref_name`, and dynamic shell-code sinks.
+- Narrowed static release provenance to `unknown` until runtime and added local plus re-downloaded draft checksum/attestation verification.
+- Factored the complete 12-way matrix, evidence/dogfood, official Agent Skills validator, and four pinned real-repository lanes into one reusable proof required by PR, main, and tag release paths.
+- Added tag-to-main ancestry validation, a permanent Research Preview release preamble, and a publish step that runs only after draft assets verify.
+- Added external review license/sampling/expertise/adjudicator provenance, raw confusion/prevalence output, undefined degenerate κ, public evaluation Schemas, and a separate `evaluate-holdout` accuracy evaluator without fabricating labels.
+- Added a JSON Schema for the machine-readable support matrix and documented deterministic path pseudonymization rather than secrecy.
+
 ## 0.3.1 — Boundary and release provenance hardening
 
 - Updated the non-executed composite example from Next.js 15.0.0 to 15.5.21 through Dependabot PR #7.

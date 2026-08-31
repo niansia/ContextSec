@@ -17,6 +17,7 @@ if str(SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPT_DIR))
 
 import profile_repo  # noqa: E402
+import safe_io  # noqa: E402
 
 PACKS = profile_repo.PACK_ORDER
 CLAIMS = profile_repo.PACK_CLAIMS
@@ -37,6 +38,7 @@ def validate(profile: Mapping[str, Any]) -> List[str]:
         profile,
         {
             "schema_version",
+            "artifact_options",
             "subject",
             "coverage",
             "observations",
@@ -56,6 +58,15 @@ def validate(profile: Mapping[str, Any]) -> List[str]:
         "unsupported schema_version",
         errors,
     )
+    artifact_options = profile.get("artifact_options")
+    require(isinstance(artifact_options, dict), "artifact_options must be an object", errors)
+    if isinstance(artifact_options, dict):
+        exact_keys(artifact_options, {"path_privacy"}, "artifact_options", errors)
+        require(
+            artifact_options.get("path_privacy") in profile_repo.PATH_PRIVACY_MODES,
+            "artifact_options.path_privacy is invalid",
+            errors,
+        )
 
     subject = profile.get("subject")
     require(isinstance(subject, dict), "subject must be an object", errors)
@@ -67,6 +78,11 @@ def validate(profile: Mapping[str, Any]) -> List[str]:
                 "subject_revision",
                 "source_inventory_digest",
                 "decision_model_digest",
+                "routing_model_digest",
+                "detector_model_digest",
+                "catalog_digest",
+                "composition_digest",
+                "support_matrix_digest",
                 "files_scanned",
                 "files_skipped",
                 "bytes_scanned",
@@ -87,9 +103,21 @@ def validate(profile: Mapping[str, Any]) -> List[str]:
         require(
             subject.get("decision_model_digest")
             == profile_repo.DECISION_MODEL_DIGEST,
-            "subject.decision_model_digest does not match the active catalogs",
+            "subject.decision_model_digest does not match the active routing model",
             errors,
         )
+        for field, expected in (
+            ("routing_model_digest", profile_repo.ROUTING_MODEL_DIGEST),
+            ("detector_model_digest", profile_repo.DETECTOR_MODEL_DIGEST),
+            ("catalog_digest", profile_repo.CATALOG_DIGEST),
+            ("composition_digest", profile_repo.COMPOSITION_DIGEST),
+            ("support_matrix_digest", profile_repo.SUPPORT_MATRIX_DIGEST),
+        ):
+            require(
+                subject.get(field) == expected,
+                "subject." + field + " does not match the active model",
+                errors,
+            )
         require(
             bool(
                 re.fullmatch(
@@ -129,6 +157,7 @@ def validate(profile: Mapping[str, Any]) -> List[str]:
                     "binary",
                     "invalid_encoding",
                     "invalid_manifest",
+                    "unsupported_manifest_indirection",
                 },
                 "coverage.skip_counts",
                 errors,
@@ -155,13 +184,13 @@ def validate(profile: Mapping[str, Any]) -> List[str]:
                 continue
             exact_keys(
                 item,
-                {"id", "kind", "pack", "claim", "scope", "confidence", "detector", "evidence"},
+                {"id", "kind", "evidence_family", "correlation_group", "pack", "claim", "scope", "confidence", "detector", "evidence"},
                 f"observations[{index}]",
                 errors,
             )
             observation_ids.append(item.get("id"))
             require(
-                bool(re.fullmatch(r"obs-[a-f0-9]{12}", str(item.get("id", "")))),
+                bool(re.fullmatch(r"obs-[a-f0-9]{64}", str(item.get("id", "")))),
                 f"observations[{index}] has an invalid id",
                 errors,
             )
@@ -176,7 +205,35 @@ def validate(profile: Mapping[str, Any]) -> List[str]:
                 errors,
             )
             evidence = item.get("evidence")
+            detector = item.get("detector")
+            require(isinstance(detector, dict), f"observations[{index}].detector must be an object", errors)
+            if isinstance(detector, dict):
+                exact_keys(detector, {"id", "version"}, f"observations[{index}].detector", errors)
+                require(
+                    detector.get("version") == profile_repo.DETECTOR_VERSION,
+                    f"observations[{index}] detector version is incompatible",
+                    errors,
+                )
+                contract = profile_repo.detector_contracts().get(str(detector.get("id", "")))
+                require(contract is not None, f"observations[{index}] detector id is unknown", errors)
+                if contract is not None:
+                    require(
+                        (
+                            item.get("pack"),
+                            item.get("claim"),
+                            item.get("kind"),
+                            item.get("confidence"),
+                        ) in contract,
+                        f"observations[{index}] detector contract is inconsistent",
+                        errors,
+                    )
+                    expected_family, expected_group = profile_repo.evidence_semantics(
+                        str(detector.get("id")), str(item.get("kind")), str(item.get("pack"))
+                    )
+                    require(item.get("evidence_family") == expected_family, f"observations[{index}] evidence_family is inconsistent", errors)
+                    require(item.get("correlation_group") == expected_group, f"observations[{index}] correlation_group is inconsistent", errors)
             digest_fields = (
+                "path_identity",
                 "evidence_id",
                 "location_id",
                 "content_digest",
@@ -204,6 +261,27 @@ def validate(profile: Mapping[str, Any]) -> List[str]:
                     f"observations[{index}].evidence",
                     errors,
                 )
+                if isinstance(detector, dict):
+                    path_id = str(evidence.get("path_identity", ""))
+                    locator = str(evidence.get("locator", ""))
+                    detector_id = str(detector.get("id", ""))
+                    expected_evidence = profile_repo.sha256_text(
+                        "evidence\x1f" + "\x1f".join(
+                            (path_id, locator, detector_id, profile_repo.DETECTOR_MODEL_DIGEST)
+                        )
+                    )
+                    expected_location = profile_repo.sha256_text(
+                        "location\x1f" + "\x1f".join((path_id, locator))
+                    )
+                    expected_fingerprint = profile_repo.sha256_text(
+                        "fingerprint\x1f" + "\x1f".join(
+                            (expected_evidence, str(evidence.get("content_digest", "")))
+                        )
+                    )
+                    require(evidence.get("evidence_id") == expected_evidence, f"observations[{index}] evidence_id is inconsistent", errors)
+                    require(evidence.get("location_id") == expected_location, f"observations[{index}] location_id is inconsistent", errors)
+                    require(evidence.get("fingerprint") == expected_fingerprint, f"observations[{index}] fingerprint is inconsistent", errors)
+                    require(item.get("id") == "obs-" + expected_evidence.removeprefix("sha256:"), f"observations[{index}] id is inconsistent", errors)
         require(
             len(observation_ids) == len(set(observation_ids)),
             "observation ids must be unique",
@@ -523,12 +601,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     parser.add_argument("profile", type=Path)
     args = parser.parse_args(argv)
     try:
-        payload = json.loads(args.profile.read_text(encoding="utf-8"))
+        payload = safe_io.read_json_object_bounded(
+            args.profile, 64 * 1024 * 1024, "Security profile"
+        )
     except (OSError, ValueError, RecursionError) as exc:
         print("error: unable to read profile: " + str(exc), file=sys.stderr)
-        return 2
-    if not isinstance(payload, dict):
-        print("error: profile root must be an object", file=sys.stderr)
         return 2
     errors = validate(payload)
     if errors:

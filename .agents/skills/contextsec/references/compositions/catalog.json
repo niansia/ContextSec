@@ -1,5 +1,5 @@
 {
-  "schema_version": "0.3.1",
+  "schema_version": "0.3.2",
   "rules": [
     {"id": "COMP-PAY-TEN-001", "requires": ["payments", "multi-tenant"], "intersection_capability": "flow.payment_to_tenant", "severity": "critical", "blocking": true, "invariant": "Money state, provider objects, idempotency keys, and entitlements remain tenant-bound across request, webhook, retry, refund, and payout paths.", "required_verification": "Cross-tenant provider-object, webhook replay, and entitlement mutation tests."},
     {"id": "COMP-AI-PII-001", "requires": ["ai-rag-agent", "privacy-pii"], "intersection_capability": "flow.pii_to_ai", "severity": "critical", "blocking": true, "invariant": "Personal data reaches models, tools, memory, and traces only through purpose-bound minimized projections.", "required_verification": "PII field-canary tests across prompt, tool, memory, trace, and provider failure paths."},

@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any, List, Mapping, Optional, Sequence
 
 import versioning
+import safe_io
 
 SKILL_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CATALOG = SKILL_ROOT / "references" / "catalog.json"
@@ -171,13 +172,14 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     parser.add_argument("--compositions", type=Path, default=DEFAULT_COMPOSITIONS)
     args = parser.parse_args(argv)
     try:
-        catalog = json.loads(args.catalog.read_text(encoding="utf-8"))
-        compositions = json.loads(args.compositions.read_text(encoding="utf-8"))
+        catalog = safe_io.read_json_object_bounded(
+            args.catalog, 4 * 1024 * 1024, "Pack catalog"
+        )
+        compositions = safe_io.read_json_object_bounded(
+            args.compositions, 4 * 1024 * 1024, "Composition catalog"
+        )
     except (OSError, ValueError, RecursionError) as exc:
         print("error: unable to read catalogs: " + str(exc), file=sys.stderr)
-        return 2
-    if not isinstance(catalog, dict) or not isinstance(compositions, dict):
-        print("error: catalog roots must be objects", file=sys.stderr)
         return 2
     errors = validate_catalogs(catalog, compositions, SKILL_ROOT)
     if errors:

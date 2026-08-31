@@ -7,6 +7,7 @@ import argparse
 import json
 import re
 import sys
+from datetime import date
 from pathlib import Path
 from typing import Any, Dict, Mapping, Optional, Sequence
 
@@ -20,15 +21,13 @@ import profile_repo  # noqa: E402
 import safe_io  # noqa: E402
 
 LABEL_STATES = ("required", "candidate", "inactive", "unknown")
+SCHEMA_URL = "https://raw.githubusercontent.com/niansia/ContextSec/v0.3.2/benchmarks/external-review.schema.json"
 
 
 def _load(path: Path) -> Dict[str, Any]:
-    payload = profile_repo.strict_json_loads(
-        safe_io.read_regular_file(path, 2 * 1024 * 1024).decode("utf-8-sig")
+    return safe_io.read_json_object_bounded(
+        path, 2 * 1024 * 1024, "External review manifest"
     )
-    if not isinstance(payload, dict):
-        raise ValueError("External review manifest root must be an object.")
-    return payload
 
 
 def _labels(value: Any, label: str) -> Dict[str, str]:
@@ -42,28 +41,56 @@ def _labels(value: Any, label: str) -> Dict[str, str]:
     return dict(value)
 
 
-def _agreement(pairs: Sequence[tuple[str, str]]) -> Dict[str, float]:
+def _agreement(pairs: Sequence[tuple[str, str]]) -> Dict[str, Any]:
     if not pairs:
-        return {"raw_agreement": 1.0, "cohen_kappa": 1.0}
+        return {
+            "rating_count": 0,
+            "raw_agreement": None,
+            "cohen_kappa": None,
+            "confusion_counts": {
+                left: {right: 0 for right in LABEL_STATES}
+                for left in LABEL_STATES
+            },
+            "label_prevalence": {
+                "annotator_a": {state: 0.0 for state in LABEL_STATES},
+                "annotator_b": {state: 0.0 for state in LABEL_STATES},
+            },
+        }
     observed = sum(left == right for left, right in pairs) / len(pairs)
     expected = 0.0
     for state in LABEL_STATES:
         left = sum(item[0] == state for item in pairs) / len(pairs)
         right = sum(item[1] == state for item in pairs) / len(pairs)
         expected += left * right
-    kappa = (
-        (observed - expected) / (1.0 - expected)
-        if expected < 1.0
-        else (1.0 if observed == 1.0 else 0.0)
-    )
+    kappa = (observed - expected) / (1.0 - expected) if expected < 1.0 else None
+    confusion = {
+        left: {
+            right: sum(pair == (left, right) for pair in pairs)
+            for right in LABEL_STATES
+        }
+        for left in LABEL_STATES
+    }
     return {
+        "rating_count": len(pairs),
         "raw_agreement": round(observed, 4),
-        "cohen_kappa": round(kappa, 4),
+        "cohen_kappa": round(kappa, 4) if kappa is not None else None,
+        "confusion_counts": confusion,
+        "label_prevalence": {
+            "annotator_a": {
+                state: round(sum(pair[0] == state for pair in pairs) / len(pairs), 4)
+                for state in LABEL_STATES
+            },
+            "annotator_b": {
+                state: round(sum(pair[1] == state for pair in pairs) / len(pairs), 4)
+                for state in LABEL_STATES
+            },
+        },
     }
 
 
 def evaluate(payload: Mapping[str, Any]) -> Dict[str, Any]:
     if set(payload) != {
+        "$schema",
         "version",
         "status",
         "sampling_frame",
@@ -71,6 +98,10 @@ def evaluate(payload: Mapping[str, Any]) -> Dict[str, Any]:
         "cases",
     }:
         raise ValueError("External review manifest has unexpected or missing fields.")
+    if payload.get("$schema") != SCHEMA_URL:
+        raise ValueError("External review manifest schema identity is incompatible.")
+    if not isinstance(payload.get("version"), str) or not payload["version"]:
+        raise ValueError("External review manifest version is invalid.")
     if payload.get("status") != "complete":
         raise ValueError("External review evidence must be marked complete.")
     sampling = payload.get("sampling_frame")
@@ -82,8 +113,19 @@ def evaluate(payload: Mapping[str, Any]) -> Dict[str, Any]:
         "freeze_date",
     }:
         raise ValueError("Sampling frame must be frozen and fully declared.")
-    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", str(sampling.get("freeze_date", ""))):
+    try:
+        date.fromisoformat(str(sampling.get("freeze_date", "")))
+    except ValueError:
         raise ValueError("Sampling freeze_date must be YYYY-MM-DD.")
+    for field in ("population", "selection_method"):
+        if not isinstance(sampling.get(field), str) or not sampling[field]:
+            raise ValueError("Sampling frame " + field + " must be non-empty.")
+    for field in ("inclusion_criteria", "exclusion_criteria"):
+        value = sampling.get(field)
+        if not isinstance(value, list) or not value or not all(
+            isinstance(item, str) and item for item in value
+        ):
+            raise ValueError("Sampling frame " + field + " must be non-empty strings.")
     policy = payload.get("review_policy")
     expected_policy = {
         "detector_implementers_excluded": True,
@@ -111,6 +153,11 @@ def evaluate(payload: Mapping[str, Any]) -> Dict[str, Any]:
             "commit",
             "framework_group",
             "support_class",
+            "license_spdx",
+            "license_evidence_url",
+            "selection_rank",
+            "sampling_reason",
+            "frozen_at",
             "annotator_a",
             "annotator_b",
             "consensus",
@@ -124,12 +171,27 @@ def evaluate(payload: Mapping[str, Any]) -> Dict[str, Any]:
             raise ValueError("External review cases must pin full commit IDs.")
         if case.get("support_class") not in {"supported", "partial", "unsupported"}:
             raise ValueError("External review support_class is invalid.")
+        if not isinstance(case.get("repository"), str) or not case["repository"]:
+            raise ValueError("External review repository is invalid.")
+        if not isinstance(case.get("license_spdx"), str) or not case["license_spdx"]:
+            raise ValueError("External review license_spdx is required.")
+        if re.fullmatch(r"https://[^\s]+", str(case.get("license_evidence_url", ""))) is None:
+            raise ValueError("External review license evidence must be an HTTPS URL.")
+        if type(case.get("selection_rank")) is not int or case["selection_rank"] < 1:
+            raise ValueError("External review selection_rank must be a positive integer.")
+        if not isinstance(case.get("sampling_reason"), str) or not case["sampling_reason"]:
+            raise ValueError("External review sampling_reason is required.")
+        try:
+            date.fromisoformat(str(case.get("frozen_at", "")))
+        except ValueError:
+            raise ValueError("External review frozen_at must be YYYY-MM-DD.")
         reviewers = []
         for role in ("annotator_a", "annotator_b"):
             reviewer = case.get(role)
             if not isinstance(reviewer, dict) or set(reviewer) != {
                 "reviewer_id",
                 "implemented_detectors",
+                "expertise_class",
                 "labels",
             }:
                 raise ValueError(role + " has an invalid shape.")
@@ -137,6 +199,8 @@ def evaluate(payload: Mapping[str, Any]) -> Dict[str, Any]:
                 raise ValueError("Detector implementers cannot label the external holdout.")
             if not isinstance(reviewer.get("reviewer_id"), str) or not reviewer["reviewer_id"]:
                 raise ValueError(role + " requires a reviewer_id.")
+            if not isinstance(reviewer.get("expertise_class"), str) or not reviewer["expertise_class"]:
+                raise ValueError(role + " requires an expertise_class.")
             reviewers.append(_labels(reviewer.get("labels"), role + ".labels"))
         if case["annotator_a"]["reviewer_id"] == case["annotator_b"]["reviewer_id"]:
             raise ValueError("External cases require two distinct reviewers.")
@@ -144,11 +208,17 @@ def evaluate(payload: Mapping[str, Any]) -> Dict[str, Any]:
         if not isinstance(consensus, dict) or set(consensus) != {
             "labels",
             "adjudication_reason",
+            "adjudicator_id",
+            "adjudicator_implemented_detectors",
         }:
             raise ValueError("Consensus must stay separate from raw annotations.")
         consensus_labels = _labels(consensus.get("labels"), "consensus.labels")
         if not isinstance(consensus.get("adjudication_reason"), str) or not consensus["adjudication_reason"]:
             raise ValueError("Consensus requires a non-empty adjudication reason.")
+        if not isinstance(consensus.get("adjudicator_id"), str) or not consensus["adjudicator_id"]:
+            raise ValueError("Consensus requires an adjudicator_id.")
+        if consensus.get("adjudicator_implemented_detectors") is not False:
+            raise ValueError("A detector implementer cannot adjudicate the external holdout.")
         framework = case.get("framework_group")
         if not isinstance(framework, str) or not framework:
             raise ValueError("External cases require a framework_group.")
@@ -168,12 +238,25 @@ def evaluate(payload: Mapping[str, Any]) -> Dict[str, Any]:
                 "commit": case["commit"],
                 "framework_group": framework,
                 "support_class": case["support_class"],
+                "license_spdx": case["license_spdx"],
+                "license_evidence_url": case["license_evidence_url"],
+                "selection_rank": case["selection_rank"],
+                "sampling_reason": case["sampling_reason"],
+                "frozen_at": case["frozen_at"],
+                "annotator_expertise_classes": [
+                    case["annotator_a"]["expertise_class"],
+                    case["annotator_b"]["expertise_class"],
+                ],
+                "adjudicator_id": consensus["adjudicator_id"],
                 "disagreement_packs": case_disagreements,
                 "consensus_labels": consensus_labels,
             }
         )
     if len(ids) != len(set(ids)):
         raise ValueError("External review case ids must be unique.")
+    ranks = [case["selection_rank"] for case in cases]
+    if len(ranks) != len(set(ranks)):
+        raise ValueError("External review selection_rank values must be unique.")
     return {
         "schema_version": "0.1.0",
         "suite": "independent_external_labels",

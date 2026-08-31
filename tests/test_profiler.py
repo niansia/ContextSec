@@ -221,7 +221,7 @@ class ProfilerTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "Duplicate JSON key"):
                 PROFILER.profile_repository(repository, context_file=declaration)
 
-    def test_optional_payment_dependency_plus_import_is_required(self):
+    def test_correlated_optional_dependency_and_import_remain_candidate(self):
         with tempfile.TemporaryDirectory() as temporary:
             repository = Path(temporary)
             (repository / "package.json").write_text(
@@ -233,7 +233,8 @@ class ProfilerTests(unittest.TestCase):
                 encoding="utf-8",
             )
             profile = PROFILER.profile_repository(repository)
-        self.assertIn("payments", profile["required_packs"])
+        self.assertNotIn("payments", profile["required_packs"])
+        self.assertIn("payments", profile["candidate_packs"])
 
     def test_form_data_call_activates_upload_pack(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -411,6 +412,7 @@ class ProfilerTests(unittest.TestCase):
             self.assertEqual(
                 {
                     "path",
+                    "path_identity",
                     "locator",
                     "evidence_id",
                     "location_id",

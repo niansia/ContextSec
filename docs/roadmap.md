@@ -108,8 +108,30 @@ Release gate:
 - every blocking self-routed CI control has subject-bound policy evidence;
 - self-profile covers both the repository surface and the core skill directory;
 - the adversarial suite passes its generous supported-runner ceiling and non-disclosure properties;
-- release archives are byte-identical and every external Action is owner-allowlisted and commit-pinned;
+- release archives are byte-identical and every external Action is commit-pinned;
 - future release assets are protected by repository release immutability.
+
+## v0.3.2 - Evidence identity hardening
+
+Delivered scope:
+
+- root-anchored, link-rejecting repository traversal and one bounded strict JSON boundary for untrusted artifacts;
+- separate display paths and full canonical path identities, full-length observation/finding IDs, and symmetric validator recomputation;
+- correlation-aware medium-confidence aggregation and explicit `artifact_options.path_privacy` metadata;
+- separate routing, detector, checker, catalog, composition, and support-matrix digests;
+- unsupported requirements indirection becomes partial coverage instead of a silent negative;
+- `benchmark --suite all` now includes adversarial cases;
+- one reusable full security proof for PR, main, and tag release paths, plus tag-to-main ancestry and draft-asset verification;
+- exact Action allowlisting and conservative CI audit evidence, including expression-to-environment flows and dynamic shell sinks;
+- external-review license/sampling/reviewer provenance, undefined degenerate κ, and separate `evaluate-holdout` accuracy reporting;
+- public support-matrix and external-evaluation JSON Schemas.
+
+Release gate:
+
+- tag publication waits for the same 12-way test matrix, evidence/dogfood lane, official Agent Skills validator, and four pinned real repositories used by normal CI;
+- static configuration cannot claim a particular release's provenance verified; that claim is established only when the tag run verifies local and re-downloaded draft assets;
+- every non-local Action is both commit-pinned and exactly allowlisted;
+- the tag commit must be an ancestor of `main` before build or publication.
 
 ## v0.4 - Ecosystem proof
 
