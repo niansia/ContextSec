@@ -331,9 +331,10 @@ def evaluate(
         "suite": "independent_holdout_accuracy",
         "status": "pass" if trusted else "development-only",
         "headline_eligible": trusted,
-        "evidence_trust": dict(evidence_trust) if trusted else {
-            "labels": {"status": "unsigned"},
-            "predictions": {"status": "unsigned"},
+        "evidence_trust": {
+            "labels": {"status": "verified" if trusted else "unsigned"},
+            "predictions": {"status": "verified" if trusted else "unsigned"},
+            "attestation_chronology": "verified" if trusted else "unverified",
         },
         "label_manifest_version": labels_payload.get("version"),
         "prediction_manifest_version": predictions.get("version"),
