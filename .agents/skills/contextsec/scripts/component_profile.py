@@ -168,6 +168,51 @@ def load_model(repository: Path, manifest: Path) -> Dict[str, Any]:
     return _normalize_model(payload)
 
 
+def _display_model(model: Mapping[str, Any], path_privacy: str) -> Dict[str, Any]:
+    """Return the public model shape without emitting canonical component roots."""
+
+    return {
+        "$schema": model["$schema"],
+        "schema_version": model["schema_version"],
+        "components": [
+            {
+                "id": component["id"],
+                "root": profile_repo.redact_path(component["root"], path_privacy),
+                "kind": component["kind"],
+                "depends_on": list(component["depends_on"]),
+            }
+            for component in model["components"]
+        ],
+        "flows": [dict(flow) for flow in model["flows"]],
+    }
+
+
+def _component_model_identity(
+    model: Mapping[str, Any],
+    root_identities: Optional[Mapping[str, str]] = None,
+) -> Dict[str, Any]:
+    """Bind canonical roots by identity while keeping them out of public artifacts."""
+
+    identities = root_identities or {
+        component["id"]: profile_repo.path_identity(component["root"])
+        for component in model["components"]
+    }
+    return {
+        "$schema": model["$schema"],
+        "schema_version": model["schema_version"],
+        "components": [
+            {
+                "id": component["id"],
+                "root_identity": identities[component["id"]],
+                "kind": component["kind"],
+                "depends_on": list(component["depends_on"]),
+            }
+            for component in model["components"]
+        ],
+        "flows": [dict(flow) for flow in model["flows"]],
+    }
+
+
 def build(
     repository: Path,
     manifest: Path,
@@ -175,8 +220,8 @@ def build(
     path_privacy: str = "heuristic",
 ) -> Dict[str, Any]:
     repository = repository.resolve(strict=True)
-    model = load_model(repository, manifest)
     provenance = source_provenance.read(repository)
+    model = load_model(repository, manifest)
     component_results = []
     for component in model["components"]:
         raw_root = component["root"]
@@ -203,7 +248,13 @@ def build(
                 "profile": profile,
             }
         )
-    model_digest = profile_repo.canonical_digest(model)
+    provenance_after = source_provenance.read(repository)
+    if provenance_after != provenance:
+        raise ValueError(
+            "Repository Git provenance changed during component profiling; no artifact was emitted."
+        )
+    display_model = _display_model(model, path_privacy)
+    model_digest = profile_repo.canonical_digest(_component_model_identity(model))
     subject_revision = profile_repo.canonical_digest(
         {
             "source_provenance": provenance,
@@ -229,9 +280,9 @@ def build(
             "component_model_digest": model_digest,
             "subject_revision": subject_revision,
         },
-        "component_model": model,
+        "component_model": display_model,
         "components": component_results,
-        "flows": model["flows"],
+        "flows": display_model["flows"],
         "limitations": [
             "Component boundaries and cross-component flows are explicit reviewed declarations; ContextSec does not infer deployment topology from directory names.",
             "Each component Profile is independently content-, model-, path-, and Git-provenance-bound.",
@@ -290,9 +341,6 @@ def validate(payload: Mapping[str, Any]) -> list[str]:
     }:
         errors.append("component profile subject is invalid")
         return errors
-    model_digest = profile_repo.canonical_digest(model)
-    if subject.get("component_model_digest") != model_digest:
-        errors.append("component_model_digest is inconsistent")
     normalized = []
     model_components = {
         component["id"]: component for component in normalized_model["components"]
@@ -316,13 +364,11 @@ def validate(payload: Mapping[str, Any]) -> list[str]:
             continue
         component_ids.add(identifier)
         declaration = model_components[identifier]
-        expected_root_identity = profile_repo.path_identity(declaration["root"])
-        expected_display_root = profile_repo.redact_path(
-            declaration["root"], options["path_privacy"]
-        )
         if (
-            component.get("root_identity") != expected_root_identity
-            or component.get("root") != expected_display_root
+            not isinstance(component.get("root_identity"), str)
+            or re.fullmatch(r"sha256:[a-f0-9]{64}", component["root_identity"])
+            is None
+            or component.get("root") != declaration["root"]
             or component.get("kind") != declaration["kind"]
             or component.get("depends_on") != declaration["depends_on"]
         ):
@@ -353,10 +399,26 @@ def validate(payload: Mapping[str, Any]) -> list[str]:
         errors.append("component profile does not contain every declared component exactly once")
     if [component.get("id") for component in components] != sorted(model_components):
         errors.append("component profile components are not in canonical order")
+    root_identities = {
+        component.get("id"): component.get("root_identity")
+        for component in components
+        if isinstance(component, dict)
+        and component.get("id") in model_components
+        and isinstance(component.get("root_identity"), str)
+    }
+    model_digest: Optional[str] = None
+    if set(root_identities) == set(model_components):
+        model_digest = profile_repo.canonical_digest(
+            _component_model_identity(normalized_model, root_identities)
+        )
+        if subject.get("component_model_digest") != model_digest:
+            errors.append("component_model_digest is inconsistent")
+    else:
+        errors.append("component model root identities are incomplete")
     expected_subject = profile_repo.canonical_digest(
         {
             "source_provenance": subject.get("source_provenance"),
-            "component_model_digest": model_digest,
+            "component_model_digest": model_digest or subject.get("component_model_digest"),
             "components": normalized,
         }
     )

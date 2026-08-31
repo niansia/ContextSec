@@ -16,6 +16,7 @@ if str(SCRIPT_DIR) not in sys.path:
 
 import audit_ci  # noqa: E402
 import attestation_verifier  # noqa: E402
+import check_controls  # noqa: E402
 import component_profile  # noqa: E402
 import evaluate_holdout  # noqa: E402
 import model_digest  # noqa: E402
@@ -119,6 +120,38 @@ class V04TrustClosureTests(unittest.TestCase):
             )
             self.assertNotEqual(baseline, changed_dependency)
 
+        self.assertIn("profile_repository", profile_repo.DETECTOR_MODEL_SYMBOLS)
+        self.assertIn("check_repository", check_controls.CHECKER_MODEL_SYMBOLS)
+        orchestration_cases = (
+            (
+                Path(profile_repo.__file__),
+                "profile_repository",
+                'coverage_status = "partial" if partial else "complete"',
+                'coverage_status = "partial"',
+            ),
+            (
+                Path(check_controls.__file__),
+                "check_repository",
+                'findings.sort(key=lambda item: item["id"])',
+                'findings.sort(key=lambda item: item["id"], reverse=True)',
+            ),
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            for index, (source, symbol, before, after) in enumerate(
+                orchestration_cases
+            ):
+                original = source.read_text(encoding="utf-8")
+                self.assertIn(before, original)
+                changed = Path(temporary) / f"orchestration-{index}.py"
+                changed.write_text(original.replace(before, after, 1), encoding="utf-8")
+                baseline = model_digest.semantic_model_digest(
+                    path=source, symbols=(symbol,), dependencies={}
+                )
+                mutated = model_digest.semantic_model_digest(
+                    path=changed, symbols=(symbol,), dependencies={}
+                )
+                self.assertNotEqual(baseline, mutated)
+
     def test_profile_git_provenance_requires_a_clean_checkout(self):
         with tempfile.TemporaryDirectory() as temporary:
             repository = Path(temporary) / "repository"
@@ -143,6 +176,32 @@ class V04TrustClosureTests(unittest.TestCase):
             self.assertNotEqual(
                 clean["subject"]["subject_revision"], dirty["subject"]["subject_revision"]
             )
+
+    def test_profile_rejects_git_provenance_change_during_scan(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            repository = Path(temporary) / "repository"
+            repository.mkdir()
+            (repository / "package.json").write_text(
+                '{"dependencies":{"next":"1.0.0"}}', encoding="utf-8"
+            )
+            commit = "a" * 40
+            before = {
+                "status": "verified",
+                "vcs": "git",
+                "repository": "https://github.com/example/race",
+                "commit": commit,
+                "worktree": "clean",
+            }
+            after = dict(before, status="dirty", worktree="dirty")
+            with mock.patch.object(
+                profile_repo.source_provenance,
+                "read",
+                side_effect=(before, after),
+            ):
+                with self.assertRaisesRegex(
+                    ValueError, "Git provenance changed during profiling"
+                ):
+                    profile_repo.profile_repository(repository)
 
     def test_profile_git_provenance_supports_linked_worktrees(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -228,15 +287,54 @@ class V04TrustClosureTests(unittest.TestCase):
             self.assertTrue(component_profile.validate(tampered))
             forged_model = json.loads(json.dumps(result))
             forged_model["component_model"]["components"][0]["depends_on"] = ["missing"]
-            forged_model["subject"]["component_model_digest"] = profile_repo.canonical_digest(
-                forged_model["component_model"]
-            )
             self.assertTrue(component_profile.validate(forged_model))
             overlapping = json.loads(json.dumps(manifest))
             overlapping["components"][1]["root"] = "apps/web/nested"
             (repository / "overlap.json").write_text(json.dumps(overlapping), encoding="utf-8")
             with self.assertRaises(ValueError):
                 component_profile.load_model(repository, Path("overlap.json"))
+
+    def test_component_profile_never_emits_raw_roots_in_private_path_modes(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            repository = Path(temporary) / "monorepo"
+            sensitive_root = "services/customer_alice/private-api"
+            component_root = repository.joinpath(*sensitive_root.split("/"))
+            component_root.mkdir(parents=True)
+            (component_root / "requirements.txt").write_text(
+                "fastapi==1.0\n", encoding="utf-8"
+            )
+            manifest = {
+                "$schema": component_profile.MODEL_SCHEMA_URL,
+                "schema_version": "0.4.0",
+                "components": [
+                    {
+                        "id": "private_api",
+                        "root": sensitive_root,
+                        "kind": "service",
+                        "depends_on": [],
+                    }
+                ],
+                "flows": [],
+            }
+            (repository / "contextsec.components.json").write_text(
+                json.dumps(manifest), encoding="utf-8"
+            )
+            _git_repository(repository)
+            for mode in ("hashed", "opaque"):
+                result = component_profile.build(
+                    repository,
+                    Path("contextsec.components.json"),
+                    path_privacy=mode,
+                )
+                serialized = json.dumps(result, ensure_ascii=False)
+                self.assertNotIn(sensitive_root, serialized)
+                self.assertNotIn("customer_alice", serialized)
+                expected = profile_repo.redact_path(sensitive_root, mode)
+                self.assertEqual(
+                    expected, result["component_model"]["components"][0]["root"]
+                )
+                self.assertEqual(expected, result["components"][0]["root"])
+                self.assertEqual([], component_profile.validate(result))
 
     def test_ci_parser_audits_docker_digests_and_effective_job_permissions(self):
         workflow = """permissions:\n  contents: read\njobs:\n  test:\n    runs-on: ubuntu-latest\n  publish:\n    permissions:\n      contents: write\n      id-token: write\n"""
@@ -251,6 +349,25 @@ class V04TrustClosureTests(unittest.TestCase):
             audit_ci.IMMUTABLE_DOCKER.fullmatch(
                 "docker://alpine@sha256:" + "a" * 64
             )
+        )
+        image_workflow = """permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/example/test@sha256:{container_digest}
+    services:
+      redis:
+        image: redis:latest
+    steps:
+      - uses: example/action@{action_digest}
+        with:
+          image: artifact-name
+""".format(container_digest="a" * 64, action_digest="b" * 40)
+        self.assertEqual(
+            ["ghcr.io/example/test@sha256:" + "a" * 64, "redis:latest"],
+            audit_ci._container_images(image_workflow),
         )
         with tempfile.TemporaryDirectory() as temporary:
             copy = Path(temporary) / "repo"
@@ -290,12 +407,12 @@ class V04TrustClosureTests(unittest.TestCase):
 
     def test_release_evidence_binds_exact_main_models_coverage_and_archive(self):
         with tempfile.TemporaryDirectory() as temporary:
-            archive = Path(temporary) / "contextsec-v0.4.0.zip"
+            archive = Path(temporary) / "contextsec-v0.4.1.zip"
             archive.write_bytes(b"deterministic archive")
             commit = "a" * 40
             payload = release_evidence.build(
                 archive,
-                tag="v0.4.0",
+                tag="v0.4.1",
                 source_commit=commit,
                 main_commit=commit,
                 workflow_run="https://github.com/example/repository/actions/runs/1/attempts/1",
@@ -312,7 +429,7 @@ class V04TrustClosureTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 release_evidence.build(
                     archive,
-                    tag="v0.4.0",
+                    tag="v0.4.1",
                     source_commit=commit,
                     main_commit="b" * 40,
                     workflow_run="https://github.com/example/repository/actions/runs/1/attempts/1",
