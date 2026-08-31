@@ -1,0 +1,5 @@
+model AnalyticsEvent {
+  id             String @id
+  organizationId String
+  eventName      String
+}

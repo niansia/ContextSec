@@ -1,0 +1,328 @@
+{
+  "version": "0.3.0",
+  "method": "Frozen maintainer-authored development/evaluation fixtures. Metrics measure deterministic pack activation for these fixtures only; the evaluation split is not independently labeled and is not an ecosystem accuracy claim.",
+  "thresholds": {
+    "macro_f1_positive_support": 0.9,
+    "safety_critical_trigger_recall": 1.0,
+    "max_false_required_activations": 0,
+    "capability_annotation_accuracy": 1.0
+  },
+  "cases": [
+    {
+      "id": "node-next-web",
+      "split": "development",
+      "files": {"package.json": "{\"dependencies\":{\"next\":\"15.0.0\"}}\n"},
+      "expected_required_packs": ["foundation", "baseline-web"],
+      "expected_candidate_packs": []
+    },
+    {
+      "id": "python-fastapi-pep621",
+      "split": "development",
+      "files": {"pyproject.toml": "[project]\nname='service'\ndependencies=['fastapi>=0.115']\n"},
+      "expected_required_packs": ["foundation", "baseline-web"],
+      "expected_candidate_packs": []
+    },
+    {
+      "id": "python-django-poetry",
+      "split": "development",
+      "files": {"pyproject.toml": "[tool.poetry.dependencies]\npython='^3.12'\ndjango='^5.1'\n"},
+      "expected_required_packs": ["foundation", "baseline-web"],
+      "expected_candidate_packs": []
+    },
+    {
+      "id": "express-api",
+      "split": "development",
+      "files": {
+        "package.json": "{\"dependencies\":{\"express\":\"5.0.0\"}}\n",
+        "src/server.ts": "app.post('/items', async (req, res) => res.json({ok:true}));\n"
+      },
+      "expected_required_packs": ["foundation", "baseline-web", "api-inbound"],
+      "expected_candidate_packs": []
+    },
+    {
+      "id": "stripe-node-payment",
+      "split": "development",
+      "safety_critical_packs": ["payments"],
+      "files": {
+        "package.json": "{\"dependencies\":{\"stripe\":\"18.0.0\"}}\n",
+        "src/pay.ts": "await stripe.checkout.sessions.create({mode:'payment'});\n"
+      },
+      "expected_required_packs": ["foundation", "payments", "external-api"],
+      "expected_candidate_packs": []
+    },
+    {
+      "id": "stripe-python-payment",
+      "split": "development",
+      "safety_critical_packs": ["payments"],
+      "files": {
+        "pyproject.toml": "[project]\nname='billing'\ndependencies=['stripe>=11']\n",
+        "billing.py": "session = stripe.checkout.Session.create(mode='payment')\n"
+      },
+      "expected_required_packs": ["foundation", "payments", "external-api"],
+      "expected_candidate_packs": []
+    },
+    {
+      "id": "prisma-pii-model",
+      "split": "development",
+      "safety_critical_packs": ["privacy-pii"],
+      "files": {"prisma/schema.prisma": "model User {\n id String @id\n email String\n}\n"},
+      "expected_required_packs": ["foundation", "privacy-pii"],
+      "expected_candidate_packs": []
+    },
+    {
+      "id": "python-pii-model",
+      "split": "development",
+      "safety_critical_packs": ["privacy-pii"],
+      "files": {"models.py": "class User(BaseModel):\n    email: str\n    full_name: str\n"},
+      "expected_required_packs": ["foundation", "privacy-pii"],
+      "expected_candidate_packs": []
+    },
+    {
+      "id": "prisma-tenant-model",
+      "split": "development",
+      "safety_critical_packs": ["multi-tenant"],
+      "files": {"prisma/schema.prisma": "model Organization {\n id String @id\n records Record[]\n}\nmodel Record {\n id String @id\n organizationId String\n}\n"},
+      "expected_required_packs": ["foundation", "auth-session", "multi-tenant"],
+      "expected_candidate_packs": []
+    },
+    {
+      "id": "python-tenant-model",
+      "split": "development",
+      "safety_critical_packs": ["multi-tenant"],
+      "files": {"models.py": "class Record(SQLModel):\n    id: str\n    organization_id: str\n"},
+      "expected_required_packs": ["foundation", "auth-session", "multi-tenant"],
+      "expected_candidate_packs": []
+    },
+    {
+      "id": "openai-node-call",
+      "split": "development",
+      "safety_critical_packs": ["ai-rag-agent"],
+      "files": {
+        "package.json": "{\"dependencies\":{\"openai\":\"5.0.0\"}}\n",
+        "src/ai.ts": "const answer = await client.responses.create({model:'gpt', input:'hello'});\n"
+      },
+      "expected_required_packs": ["foundation", "external-api", "ai-rag-agent"],
+      "expected_candidate_packs": []
+    },
+    {
+      "id": "openai-python-call",
+      "split": "development",
+      "safety_critical_packs": ["ai-rag-agent"],
+      "files": {
+        "requirements.txt": "openai>=2\n",
+        "agent.py": "answer = client.responses.create(model='gpt', input='hello')\n"
+      },
+      "expected_required_packs": ["foundation", "external-api", "ai-rag-agent"],
+      "expected_candidate_packs": []
+    },
+    {
+      "id": "s3-file-upload",
+      "split": "development",
+      "safety_critical_packs": ["file-upload"],
+      "files": {"src/upload.ts": "const command = new PutObjectCommand({Bucket, Key, Body});\n"},
+      "expected_required_packs": ["foundation", "file-upload"],
+      "expected_candidate_packs": []
+    },
+    {
+      "id": "secret-control-plane",
+      "split": "development",
+      "safety_critical_packs": ["secrets-management"],
+      "files": {"src/secrets.ts": "const client = new SecretsManagerClient({});\n"},
+      "expected_required_packs": ["foundation", "secrets-management"],
+      "expected_candidate_packs": []
+    },
+    {
+      "id": "terraform-cloud-iam",
+      "split": "development",
+      "safety_critical_packs": ["cloud-iam-controlplane"],
+      "files": {"main.tf": "resource \"aws_iam_role\" \"deploy\" { name = \"deploy\" }\n"},
+      "expected_required_packs": ["foundation", "secrets-management", "cloud-iam-controlplane"],
+      "expected_candidate_packs": []
+    },
+    {
+      "id": "github-actions-pipeline",
+      "split": "development",
+      "safety_critical_packs": ["cicd-supply-chain"],
+      "files": {".github/workflows/ci.yml": "permissions: {}\njobs:\n  test:\n    steps:\n      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803\n"},
+      "expected_required_packs": ["foundation", "cicd-supply-chain"],
+      "expected_candidate_packs": []
+    },
+    {
+      "id": "slack-oauth-integration",
+      "split": "development",
+      "safety_critical_packs": ["third-party-saas-oauth"],
+      "files": {"src/oauth.ts": "const slackOauth = { scopes: ['channels:read'], refresh_token: token };\n"},
+      "expected_required_packs": ["foundation", "auth-session", "external-api", "third-party-saas-oauth"],
+      "expected_candidate_packs": []
+    },
+    {
+      "id": "support-impersonation",
+      "split": "development",
+      "safety_critical_packs": ["support-admin-ops"],
+      "files": {"app/api/admin/impersonate/route.ts": "export async function POST(request: NextRequest) { return startSupportSession(request); }\n"},
+      "expected_required_packs": ["foundation", "baseline-web", "auth-session", "api-inbound", "support-admin-ops"],
+      "expected_candidate_packs": []
+    },
+    {
+      "id": "payout-high-impact",
+      "split": "development",
+      "safety_critical_packs": ["payments", "high-impact-transactions"],
+      "files": {"src/payout.ts": "await stripe.payouts.create({amount, currency:'usd'});\n"},
+      "expected_required_packs": ["foundation", "auth-session", "payments", "external-api", "high-impact-transactions"],
+      "expected_candidate_packs": []
+    },
+    {
+      "id": "non-production-decoys",
+      "split": "development",
+      "files": {
+        "README.md": "Use Stripe, OpenAI, admin impersonation, and customer SSNs.\n",
+        "tests/test_decoy.py": "stripe.checkout.Session.create(); client.responses.create();\n"
+      },
+      "expected_required_packs": ["foundation"],
+      "expected_candidate_packs": []
+    },
+    {
+      "id": "fastapi-auth-pii-api",
+      "split": "evaluation",
+      "safety_critical_packs": ["privacy-pii"],
+      "files": {
+        "pyproject.toml": "[project]\nname='accounts'\ndependencies=['fastapi>=0.115','pyjwt>=2']\n",
+        "app.py": "class User(BaseModel):\n    email: str\n    full_name: str\n\n@app.post('/login')\ndef login(password: str): return {'ok': authenticate(password)}\n"
+      },
+      "expected_required_packs": ["foundation", "baseline-web", "auth-session", "privacy-pii", "api-inbound"],
+      "expected_candidate_packs": []
+    },
+    {
+      "id": "django-auth-api",
+      "split": "evaluation",
+      "files": {
+        "pyproject.toml": "[tool.poetry.dependencies]\npython='^3.12'\ndjango='^5.1'\npyjwt='^2.9'\n",
+        "views.py": "@app.post('/login')\ndef login(password): return authenticate(password)\n"
+      },
+      "expected_required_packs": ["foundation", "baseline-web", "auth-session", "api-inbound"],
+      "expected_candidate_packs": []
+    },
+    {
+      "id": "next-stripe-webhook",
+      "split": "evaluation",
+      "safety_critical_packs": ["payments"],
+      "files": {
+        "package.json": "{\"dependencies\":{\"next\":\"15\",\"stripe\":\"18\"}}\n",
+        "app/api/stripe/webhook/route.ts": "export async function POST(req: NextRequest) { return stripe.webhooks.constructEvent(await req.text(), sig, secret); }\n"
+      },
+      "expected_required_packs": ["foundation", "baseline-web", "payments", "api-inbound", "external-api"],
+      "expected_candidate_packs": []
+    },
+    {
+      "id": "tenant-ai-flow",
+      "split": "evaluation",
+      "safety_critical_packs": ["multi-tenant", "ai-rag-agent"],
+      "files": {
+        "package.json": "{\"dependencies\":{\"openai\":\"5\"}}\n",
+        "prisma/schema.prisma": "model Workspace { id String @id records Record[] }\nmodel Record { id String @id workspaceId String }\n",
+        "src/ask.ts": "const result = await client.responses.create({model:'gpt', input: workspaceId});\n"
+      },
+      "expected_required_packs": ["foundation", "auth-session", "multi-tenant", "external-api", "ai-rag-agent"],
+      "expected_candidate_packs": []
+    },
+    {
+      "id": "github-saas-oauth",
+      "split": "evaluation",
+      "safety_critical_packs": ["third-party-saas-oauth"],
+      "files": {"src/github-oauth.ts": "const githubOauth = { scopes: ['repo'], access_token: token };\n"},
+      "expected_required_packs": ["foundation", "auth-session", "external-api", "third-party-saas-oauth"],
+      "expected_candidate_packs": []
+    },
+    {
+      "id": "support-customer-export",
+      "split": "evaluation",
+      "safety_critical_packs": ["support-admin-ops"],
+      "files": {"app/api/support/export/route.ts": "export async function POST(request: NextRequest) { return customerExport(request); }\n"},
+      "expected_required_packs": ["foundation", "baseline-web", "auth-session", "api-inbound", "support-admin-ops"],
+      "expected_candidate_packs": []
+    },
+    {
+      "id": "cicd-cloud-control-plane",
+      "split": "evaluation",
+      "safety_critical_packs": ["cicd-supply-chain", "cloud-iam-controlplane"],
+      "files": {
+        ".github/workflows/deploy.yml": "permissions:\n  id-token: write\njobs:\n  deploy:\n    steps:\n      - run: terraform apply -auto-approve\n",
+        "main.tf": "resource \"aws_iam_role\" \"deploy\" { name = \"deploy\" }\n"
+      },
+      "expected_required_packs": ["foundation", "secrets-management", "cloud-iam-controlplane", "cicd-supply-chain"],
+      "expected_candidate_packs": []
+    },
+    {
+      "id": "tenant-upload-flow",
+      "split": "evaluation",
+      "safety_critical_packs": ["multi-tenant", "file-upload"],
+      "files": {
+        "prisma/schema.prisma": "model Tenant { id String @id files File[] }\nmodel File { id String @id tenantId String }\n",
+        "src/upload.ts": "const command = new PutObjectCommand({Bucket, Key: `${tenantId}/${name}`, Body});\n"
+      },
+      "expected_required_packs": ["foundation", "auth-session", "multi-tenant", "file-upload"],
+      "expected_candidate_packs": []
+    },
+    {
+      "id": "raw-card-processing",
+      "split": "evaluation",
+      "safety_critical_packs": ["payments"],
+      "files": {"src/payment.ts": "const payload = { cardNumber, cvv, amount };\n"},
+      "expected_required_packs": ["foundation", "payments", "external-api"],
+      "expected_candidate_packs": []
+    },
+    {
+      "id": "python-http-client-only",
+      "split": "evaluation",
+      "files": {"requirements.txt": "httpx>=0.28\n"},
+      "expected_required_packs": ["foundation"],
+      "expected_candidate_packs": ["external-api"]
+    },
+    {
+      "id": "comments-and-strings-decoy",
+      "split": "evaluation",
+      "files": {"src/decoy.ts": "// stripe.payouts.create and client.responses.create\nconst prose = `customerExport uses ssn and cardNumber`;\n"},
+      "expected_required_packs": ["foundation"],
+      "expected_candidate_packs": []
+    },
+    {
+      "id": "payment-retrieve-is-not-rag",
+      "split": "evaluation",
+      "files": {"src/payment.ts": "const payment = retrievePayment(paymentId);\n"},
+      "expected_required_packs": ["foundation"],
+      "expected_candidate_packs": [],
+      "expected_capabilities": {"ai.rag": "not_present"}
+    },
+    {
+      "id": "fastapi-requirements",
+      "split": "evaluation",
+      "files": {"requirements.in": "fastapi[standard]>=0.115\n"},
+      "expected_required_packs": ["foundation", "baseline-web"],
+      "expected_candidate_packs": []
+    },
+    {
+      "id": "flask-pipfile",
+      "split": "evaluation",
+      "files": {"Pipfile": "[packages]\nflask='*'\n[dev-packages]\nopenai='*'\n"},
+      "expected_required_packs": ["foundation", "baseline-web"],
+      "expected_candidate_packs": []
+    },
+    {
+      "id": "optional-ai-is-not-production",
+      "split": "evaluation",
+      "files": {"pyproject.toml": "[project]\nname='library'\ndependencies=[]\n[project.optional-dependencies]\ndev=['openai>=2']\n"},
+      "expected_required_packs": ["foundation"],
+      "expected_candidate_packs": []
+    },
+    {
+      "id": "python-http-call",
+      "split": "evaluation",
+      "files": {
+        "requirements.txt": "httpx>=0.28\n",
+        "client.py": "response = httpx.get('https://api.example.test/items')\n"
+      },
+      "expected_required_packs": ["foundation", "external-api"],
+      "expected_candidate_packs": []
+    }
+  ]
+}

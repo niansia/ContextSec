@@ -1,0 +1,4 @@
+interface:
+  display_name: "ContextSec"
+  short_description: "Decide which security controls this product needs"
+  default_prompt: "Use $contextsec to profile what this product actually does, route and compose only its applicable security controls, then report the evidence-backed control ledger and release gate."

@@ -1,0 +1,28 @@
+{
+  "schema_version": "0.1.0",
+  "id": "tj-actions-changed-files-2025",
+  "event_date": "2025-03-14",
+  "title": "Compromise of tj-actions/changed-files",
+  "investigation_status": "advisory",
+  "sources": [
+    {"publisher": "GitHub Advisory Database", "url": "https://github.com/advisories/ghsa-mrrh-fwg8-r2c3", "source_date": "2025-03-15"}
+  ],
+  "confirmed_facts": [
+    "GitHub's reviewed advisory describes version tags being repointed to a malicious commit during March 14-15, 2025.",
+    "The malicious action extracted runner-process secrets and emitted them into workflow logs.",
+    "GitHub lists versions through 45.0.7 as affected and 46.0.1 as patched."
+  ],
+  "inferences": [
+    "Immutable references reduce tag-retargeting risk but do not replace action source review, token minimization, egress control, or credential rotation."
+  ],
+  "failure_patterns": ["mutable third-party build reference", "secret-rich workflow runner", "unexpected build egress", "secret disclosure through logs"],
+  "trust_boundaries": ["repository workflow to third-party action", "action process to runner memory", "runner to workflow logs and network"],
+  "contexts": ["cicd-supply-chain", "secrets-management"],
+  "controls": ["CICD-ACTION-001", "CICD-TOKEN-001", "CICD-EGRESS-001", "CICD-PROV-001", "SECRET-DETECT-001", "SECRET-ROTATE-001"],
+  "control_hypotheses": [
+    "CI checks should distinguish immutable commit pins from tags and branches.",
+    "A compromised build step should encounter minimal credentials and observable, bounded egress.",
+    "Rotation evidence is required after suspected runner-memory or log exposure."
+  ],
+  "regression": {"fixture": "tests/fixtures/cicd-supply", "expected_routes": ["cicd-supply-chain"], "mutation": "Replace an action commit SHA with a mutable tag and require CICD-ACTION-001 to fail."}
+}

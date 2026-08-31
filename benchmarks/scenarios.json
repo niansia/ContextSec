@@ -1,0 +1,179 @@
+{
+  "version": "0.3.0",
+  "automated": [
+    {
+      "id": "composite-next-saas",
+      "fixture": "examples/composite-saas",
+      "expected": {
+        "foundation": {"routed_state": "required", "direct_evidence_state": "not_applicable"},
+        "baseline-web": {"routed_state": "required", "direct_evidence_state": "high"},
+        "auth-session": {"routed_state": "required", "direct_evidence_state": "medium"},
+        "payments": {"routed_state": "required", "direct_evidence_state": "high"},
+        "privacy-pii": {"routed_state": "required", "direct_evidence_state": "high"},
+        "multi-tenant": {"routed_state": "required", "direct_evidence_state": "high"},
+        "api-inbound": {"routed_state": "required", "direct_evidence_state": "high"},
+        "external-api": {"routed_state": "required", "direct_evidence_state": "high"},
+        "file-upload": {"routed_state": "required", "direct_evidence_state": "high"},
+        "ai-rag-agent": {"routed_state": "required", "direct_evidence_state": "high"}
+      },
+      "expected_controls": {
+        "FND-SECRET-001": "required",
+        "FND-AUTHZ-001": "required",
+        "AIR-DATA-001": "required"
+      },
+      "expected_compositions": {
+        "COMP-AI-PII-001": "required",
+        "COMP-AI-TEN-001": "required",
+        "COMP-API-TEN-001": "required",
+        "COMP-PAY-TEN-001": "candidate",
+        "COMP-UPL-TEN-001": "candidate"
+      },
+      "expected_gate": "BLOCK"
+    },
+    {
+      "id": "next-static-negative-control",
+      "fixture": "examples/next-static",
+      "expected": {
+        "foundation": {"routed_state": "required", "direct_evidence_state": "not_applicable"},
+        "baseline-web": {"routed_state": "required", "direct_evidence_state": "high"},
+        "auth-session": {"routed_state": "unknown", "direct_evidence_state": "none"},
+        "payments": {"routed_state": "unknown", "direct_evidence_state": "none"},
+        "privacy-pii": {"routed_state": "unknown", "direct_evidence_state": "none"},
+        "multi-tenant": {"routed_state": "unknown", "direct_evidence_state": "none"},
+        "api-inbound": {"routed_state": "unknown", "direct_evidence_state": "none"},
+        "external-api": {"routed_state": "unknown", "direct_evidence_state": "none"},
+        "file-upload": {"routed_state": "unknown", "direct_evidence_state": "none"},
+        "ai-rag-agent": {"routed_state": "unknown", "direct_evidence_state": "none"}
+      },
+      "expected_controls": {
+        "FND-SECRET-001": "not_applicable",
+        "FND-AUTHZ-001": "not_applicable",
+        "FND-ERROR-001": "not_applicable",
+        "WEB-ADMIN-001": "not_applicable",
+        "WEB-HEADER-001": "required"
+      },
+      "expected_gate": "WARN"
+    },
+    {
+      "id": "static-site-negative-control",
+      "fixture": "tests/fixtures/static-site",
+      "expected": {
+        "foundation": {"routed_state": "required", "direct_evidence_state": "not_applicable"},
+        "baseline-web": {"routed_state": "required", "direct_evidence_state": "high"},
+        "auth-session": {"routed_state": "unknown", "direct_evidence_state": "none"},
+        "payments": {"routed_state": "unknown", "direct_evidence_state": "none"},
+        "privacy-pii": {"routed_state": "unknown", "direct_evidence_state": "none"},
+        "multi-tenant": {"routed_state": "unknown", "direct_evidence_state": "none"},
+        "api-inbound": {"routed_state": "unknown", "direct_evidence_state": "none"},
+        "external-api": {"routed_state": "unknown", "direct_evidence_state": "none"},
+        "file-upload": {"routed_state": "unknown", "direct_evidence_state": "none"},
+        "ai-rag-agent": {"routed_state": "unknown", "direct_evidence_state": "none"}
+      }
+    },
+    {
+      "id": "malicious-docs-decoy",
+      "fixture": "tests/fixtures/docs-noise",
+      "expected": {
+        "foundation": {"routed_state": "required", "direct_evidence_state": "not_applicable"},
+        "baseline-web": {"routed_state": "unknown", "direct_evidence_state": "none"},
+        "auth-session": {"routed_state": "unknown", "direct_evidence_state": "none"},
+        "payments": {"routed_state": "unknown", "direct_evidence_state": "none"},
+        "privacy-pii": {"routed_state": "unknown", "direct_evidence_state": "none"},
+        "multi-tenant": {"routed_state": "unknown", "direct_evidence_state": "none"},
+        "api-inbound": {"routed_state": "unknown", "direct_evidence_state": "none"},
+        "external-api": {"routed_state": "unknown", "direct_evidence_state": "none"},
+        "file-upload": {"routed_state": "unknown", "direct_evidence_state": "none"},
+        "ai-rag-agent": {"routed_state": "unknown", "direct_evidence_state": "none"}
+      }
+    },
+    {
+      "id": "payment-without-sdk",
+      "fixture": "tests/fixtures/provider-no-sdk",
+      "expected": {
+        "payments": {"routed_state": "required", "direct_evidence_state": "high"},
+        "external-api": {"routed_state": "required", "direct_evidence_state": "medium"}
+      }
+    },
+    {
+      "id": "template-expression-executes-ai-call",
+      "fixture": "tests/fixtures/template-expression-positive",
+      "expected": {
+        "ai-rag-agent": {"routed_state": "required", "direct_evidence_state": "high"},
+        "external-api": {"routed_state": "required", "direct_evidence_state": "high"}
+      }
+    },
+    {
+      "id": "template-prose-is-not-code",
+      "fixture": "tests/fixtures/template-literal-negative",
+      "expected": {
+        "foundation": {"routed_state": "required", "direct_evidence_state": "not_applicable"},
+        "payments": {"routed_state": "unknown", "direct_evidence_state": "none"},
+        "ai-rag-agent": {"routed_state": "unknown", "direct_evidence_state": "none"},
+        "high-impact-transactions": {"routed_state": "unknown", "direct_evidence_state": "none"}
+      }
+    },
+    {
+      "id": "product-secret-plane",
+      "fixture": "tests/fixtures/secret-plane",
+      "expected": {
+        "secrets-management": {"routed_state": "required", "direct_evidence_state": "high"},
+        "cloud-iam-controlplane": {"routed_state": "unknown", "direct_evidence_state": "none"}
+      }
+    },
+    {
+      "id": "terraform-cloud-iam",
+      "fixture": "tests/fixtures/cloud-iam",
+      "expected": {
+        "cloud-iam-controlplane": {"routed_state": "required", "direct_evidence_state": "high"},
+        "secrets-management": {"routed_state": "required", "direct_evidence_state": "none"}
+      }
+    },
+    {
+      "id": "github-actions-delivery-plane",
+      "fixture": "tests/fixtures/cicd-supply",
+      "expected": {
+        "cicd-supply-chain": {"routed_state": "required", "direct_evidence_state": "high"},
+        "cloud-iam-controlplane": {"routed_state": "unknown", "direct_evidence_state": "none"}
+      }
+    },
+    {
+      "id": "delegated-saas-oauth",
+      "fixture": "tests/fixtures/saas-oauth",
+      "expected": {
+        "third-party-saas-oauth": {"routed_state": "required", "direct_evidence_state": "high"},
+        "auth-session": {"routed_state": "required", "direct_evidence_state": "none"},
+        "external-api": {"routed_state": "required", "direct_evidence_state": "none"}
+      }
+    },
+    {
+      "id": "support-impersonation-surface",
+      "fixture": "tests/fixtures/support-admin",
+      "expected": {
+        "support-admin-ops": {"routed_state": "required", "direct_evidence_state": "high"},
+        "auth-session": {"routed_state": "required", "direct_evidence_state": "none"},
+        "api-inbound": {"routed_state": "required", "direct_evidence_state": "high"},
+        "baseline-web": {"routed_state": "required", "direct_evidence_state": "none"}
+      }
+    },
+    {
+      "id": "payout-is-high-impact",
+      "fixture": "tests/fixtures/high-impact",
+      "expected": {
+        "high-impact-transactions": {"routed_state": "required", "direct_evidence_state": "high"},
+        "payments": {"routed_state": "required", "direct_evidence_state": "high"},
+        "auth-session": {"routed_state": "required", "direct_evidence_state": "none"},
+        "external-api": {"routed_state": "required", "direct_evidence_state": "none"}
+      }
+    }
+  ],
+  "adversarial_backlog": [
+    "Tenant key aliases and analytics-only false positives",
+    "Raw card fields contradict hosted-checkout declaration",
+    "Monorepo component-scoped profiles",
+    "Free-text/OCR PII egress",
+    "Stale evidence replay",
+    "Waiver authorization and expiry",
+    "Externally labeled repository holdout",
+    "Diff impact through shared middleware and schemas"
+  ]
+}

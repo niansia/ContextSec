@@ -1,0 +1,28 @@
+{
+  "schema_version": "0.1.0",
+  "id": "npm-github-oidc-cloud-pivot-2025",
+  "event_date": "2025-09-01",
+  "title": "Compromised NPM package to GitHub OIDC and AWS administrator pivot",
+  "investigation_status": "published",
+  "sources": [
+    {"publisher": "Google Cloud Mandiant", "url": "https://cloud.google.com/security/report/resources/cloud-threat-horizons-report-h1-2026", "source_date": "2026-02-24"}
+  ],
+  "confirmed_facts": [
+    "Google Cloud described a 2025 case where a compromised NPM package stole a developer GitHub token.",
+    "The actor abused GitHub-to-AWS OIDC trust and an overly permissive CloudFormation role to create an administrator role.",
+    "Google Cloud reported S3 access, production resource termination, key decryption, and repository exposure within the attack chain."
+  ],
+  "inferences": [
+    "Short-lived OIDC credentials are not sufficient when subject conditions and the assumable cloud role permit creation of broader IAM authority."
+  ],
+  "failure_patterns": ["developer supply-chain compromise", "source-control token theft", "overbroad CI OIDC trust", "deployment role privilege escalation", "cloud data destruction"],
+  "trust_boundaries": ["package update to developer endpoint", "developer identity to GitHub", "GitHub workflow identity to AWS STS", "deployment role to IAM and production resources"],
+  "contexts": ["cicd-supply-chain", "cloud-iam-controlplane", "secrets-management"],
+  "controls": ["CICD-OIDC-001", "CICD-TOKEN-001", "CICD-PROV-001", "IAM-SVC-001", "IAM-LATERAL-001", "IAM-AUDIT-001", "COMP-CIC-IAM-001"],
+  "control_hypotheses": [
+    "OIDC trust must bind exact repository, workflow, ref, environment, and audience rather than trusting an organization broadly.",
+    "Deployment roles must not create or pass roles outside a reviewed boundary.",
+    "The composition control should fail when a workflow can alter the identity policy that authorizes itself."
+  ],
+  "regression": {"fixture": "tests/fixtures/cloud-iam", "expected_routes": ["cloud-iam-controlplane"], "mutation": "Add a broadly trusted GitHub OIDC subject and iam:PassRole or CloudFormation IAM capability with no boundary."}
+}

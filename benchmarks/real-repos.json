@@ -1,0 +1,50 @@
+{
+  "version": "0.3.0",
+  "method": "Four manually reviewed public-repository case studies pinned to exact commits on 2026-08-31. The runner never clones, installs, imports, builds, or executes target code; it accepts existing local checkouts, verifies HEAD, and profiles bounded text. These cases demonstrate reproducibility and failure modes, not representative ecosystem accuracy.",
+  "repositories": [
+    {
+      "id": "niansia-merriv",
+      "directory": "Merriv",
+      "repository": "https://github.com/niansia/Merriv",
+      "commit": "2fed8dc98273bb838920a0b5f06a79222f051e16",
+      "license": "Apache-2.0",
+      "label_source": "maintainer-reviewed public source and project purpose",
+      "expected_coverage": "complete",
+      "expected_required_packs": ["foundation", "external-api", "ai-rag-agent", "cicd-supply-chain"],
+      "expected_candidate_packs": ["privacy-pii"]
+    },
+    {
+      "id": "fastapi-full-stack-template",
+      "directory": "fastapi-template",
+      "repository": "https://github.com/fastapi/full-stack-fastapi-template",
+      "commit": "486f054cc8d1aead59ec96cc0a16933d06c10e0d",
+      "license": "MIT",
+      "label_source": "maintainer-reviewed public source and project purpose",
+      "expected_coverage": "complete",
+      "expected_required_packs": ["foundation", "baseline-web", "auth-session", "privacy-pii", "api-inbound", "file-upload", "cicd-supply-chain", "high-impact-transactions"],
+      "expected_candidate_packs": ["external-api"]
+    },
+    {
+      "id": "stripe-accept-a-payment",
+      "directory": "stripe-accept-payment",
+      "repository": "https://github.com/stripe-samples/accept-a-payment",
+      "commit": "1a57c3b2f5aaf4ecd8de59ab0b1c3c5638827625",
+      "license": "MIT",
+      "label_source": "maintainer-reviewed public source and project purpose",
+      "expected_coverage": "partial",
+      "expected_required_packs": ["foundation", "baseline-web", "payments", "api-inbound", "external-api", "cicd-supply-chain"],
+      "expected_candidate_packs": ["privacy-pii"]
+    },
+    {
+      "id": "openai-quickstart-node",
+      "directory": "openai-quickstart-node",
+      "repository": "https://github.com/openai/openai-quickstart-node",
+      "commit": "6e6e03496440913a82ccba6f17c2f41caa948c58",
+      "license": "MIT",
+      "label_source": "maintainer-reviewed public source and project purpose",
+      "expected_coverage": "complete",
+      "expected_required_packs": ["foundation", "external-api", "ai-rag-agent"],
+      "expected_candidate_packs": []
+    }
+  ]
+}

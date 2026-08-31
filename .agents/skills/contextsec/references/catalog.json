@@ -1,0 +1,303 @@
+{
+  "schema_version": "0.2.1",
+  "capabilities": [
+    "ai.autonomous_action",
+    "ai.memory",
+    "ai.rag",
+    "ai.tools",
+    "auth.api_token",
+    "auth.oauth",
+    "auth.password_login",
+    "auth.recovery",
+    "authority.secrets_used",
+    "authority.server_actions",
+    "cicd.cloud_deploy",
+    "cicd.oidc",
+    "cicd.package_publish",
+    "cicd.untrusted_pr",
+    "external.user_controlled_destination",
+    "flow.ai_to_high_impact",
+    "flow.api_to_tenant",
+    "flow.cicd_to_cloud",
+    "flow.payment_to_tenant",
+    "flow.pii_to_ai",
+    "flow.pii_to_saas",
+    "flow.support_to_tenant",
+    "flow.tenant_to_ai",
+    "flow.upload_to_tenant",
+    "high_impact.transaction",
+    "payment.payout",
+    "payment.refund",
+    "payment.subscription",
+    "payment.webhook",
+    "runtime.failure_prone_processing",
+    "support.bulk_access",
+    "support.impersonation",
+    "web.admin_surface",
+    "web.cookie_auth",
+    "web.sensitive_response",
+    "web.state_change"
+  ],
+  "packs": [
+    {
+      "id": "foundation",
+      "claim": null,
+      "dependencies": [],
+      "reference": "packs/foundation.md",
+      "activation": "Every software repository.",
+      "controls": [
+        {"id": "FND-SECRET-001", "severity": "critical", "blocking": true, "applies_when": {"all": ["authority.secrets_used"]}, "invariant": "Privileged credentials do not enter source, logs, public bundles, or untrusted builds.", "required_verification": "Secret scan and configuration or artifact inspection without revealing values."},
+        {"id": "FND-DEP-001", "severity": "high", "blocking": false, "invariant": "Production dependencies and build actions are controlled and originate from intended sources.", "required_verification": "Lockfile, action reference, provenance, and existing dependency scanner evidence."},
+        {"id": "FND-BOUNDARY-001", "severity": "high", "blocking": false, "applies_when": {"all": ["authority.server_actions"]}, "invariant": "Trust-boundary input is parsed and validated before sensitive use.", "required_verification": "A negative boundary test for each active product-risk pack."},
+        {"id": "FND-AUTHZ-001", "severity": "critical", "blocking": true, "applies_when": {"all": ["authority.server_actions"]}, "invariant": "Server-side authorization protects privileged actions and owned resources.", "required_verification": "Negative authorization test at the real server-side operation."},
+        {"id": "FND-LOG-001", "severity": "high", "blocking": false, "applies_when": {"all": ["authority.server_actions"]}, "invariant": "Security events are attributable without leaking secrets or unnecessary personal data.", "required_verification": "Logging configuration inspection and representative failure-path assertion."},
+        {"id": "FND-ERROR-001", "severity": "high", "blocking": true, "applies_when": {"all": ["runtime.failure_prone_processing"]}, "invariant": "Parser, scanner, timeout, and unsupported-mode failures fail closed.", "required_verification": "Forced error or timeout test."}
+      ]
+    },
+    {
+      "id": "baseline-web",
+      "claim": "capabilities.web",
+      "dependencies": [],
+      "reference": "packs/baseline-web.md",
+      "activation": "Web framework, public HTTP surface, browser client, or server-rendered application.",
+      "controls": [
+        {"id": "WEB-OUT-001", "severity": "high", "blocking": false, "invariant": "Untrusted output is encoded for its rendering context.", "required_verification": "Framework-specific contextual-encoding test or path review."},
+        {"id": "WEB-CSRF-001", "severity": "high", "blocking": false, "applies_when": {"all": ["web.cookie_auth", "web.state_change"]}, "invariant": "Cookie-authenticated state changes resist cross-site requests.", "required_verification": "Cross-origin negative test or effective framework assertion."},
+        {"id": "WEB-HEADER-001", "severity": "medium", "blocking": false, "invariant": "Transport and browser headers match the deployed application.", "required_verification": "Deployed-mode response-header integration test."},
+        {"id": "WEB-COOKIE-001", "severity": "high", "blocking": false, "applies_when": {"all": ["web.cookie_auth"]}, "invariant": "Sensitive cookies use secure attributes, narrow scope, and bounded lifetime.", "required_verification": "Response or effective configuration inspection."},
+        {"id": "WEB-CACHE-001", "severity": "high", "blocking": false, "applies_when": {"all": ["web.sensitive_response"]}, "invariant": "Sensitive responses cannot enter shared or public caches.", "required_verification": "Representative sensitive-route cache-header test."},
+        {"id": "WEB-ADMIN-001", "severity": "critical", "blocking": true, "applies_when": {"all": ["web.admin_surface"]}, "invariant": "Administrative web surfaces require server-side authentication and authorization.", "required_verification": "Unauthorized and wrong-role route tests."}
+      ]
+    },
+    {
+      "id": "auth-session",
+      "claim": "identity.authentication",
+      "dependencies": [],
+      "reference": "packs/auth-session.md",
+      "activation": "Login, session, OAuth/OIDC, recovery, API authentication, or roles.",
+      "controls": [
+        {"id": "AUTH-LOGIN-001", "severity": "high", "blocking": false, "applies_when": {"all": ["auth.password_login"]}, "invariant": "Login resists account enumeration and automated guessing.", "required_verification": "Enumeration and rate-control negative tests."},
+        {"id": "AUTH-SESSION-001", "severity": "critical", "blocking": true, "applies_when": {"all": ["web.cookie_auth"]}, "invariant": "Sessions rotate, expire, revoke, and are accepted only from safe locations.", "required_verification": "Fixation, logout, revocation, and expiry tests."},
+        {"id": "AUTH-RECOVERY-001", "severity": "critical", "blocking": true, "applies_when": {"all": ["auth.recovery"]}, "invariant": "Recovery tokens are random, single-use, short-lived, and intent-bound.", "required_verification": "Replay, expiry, and account-confusion tests."},
+        {"id": "AUTH-OAUTH-001", "severity": "critical", "blocking": true, "applies_when": {"all": ["auth.oauth"]}, "invariant": "OAuth/OIDC validates redirect intent, state, nonce, issuer, audience, signature, expiry, and PKCE where applicable.", "required_verification": "Tampered protocol-field and redirect mismatch tests."},
+        {"id": "AUTH-TOKEN-001", "severity": "critical", "blocking": true, "applies_when": {"all": ["auth.api_token"]}, "invariant": "API tokens are least-scoped and validated by the intended resource server.", "required_verification": "Wrong audience, scope, and token-type tests."},
+        {"id": "AUTH-STEPUP-001", "severity": "high", "blocking": false, "applies_when": {"all": ["high_impact.transaction"]}, "invariant": "High-impact actions require fresh or stronger authentication where warranted.", "required_verification": "Stale or low-assurance session rejection test."}
+      ]
+    },
+    {
+      "id": "payments",
+      "claim": "capabilities.payments",
+      "dependencies": ["external-api"],
+      "reference": "packs/payments.md",
+      "activation": "Checkout, billing, subscriptions, refunds, payouts, or movement of monetary value.",
+      "controls": [
+        {"id": "PAY-SCOPE-001", "severity": "critical", "blocking": true, "invariant": "Cardholder-data scope is explicit and sensitive authentication data is never retained.", "required_verification": "Client/server data-flow and provider configuration inspection."},
+        {"id": "PAY-PRICE-001", "severity": "critical", "blocking": true, "invariant": "Amount, currency, product, discount, recipient, and entitlement derive from trusted server state.", "required_verification": "Client-field tampering tests."},
+        {"id": "PAY-STATE-001", "severity": "critical", "blocking": true, "invariant": "Client callbacks and redirects cannot grant paid state.", "required_verification": "Fake-success and forged-callback tests."},
+        {"id": "PAY-WEBHOOK-001", "severity": "critical", "blocking": true, "applies_when": {"all": ["payment.webhook"]}, "invariant": "Provider events authenticate the unmodified body and enforce freshness where supported.", "required_verification": "Invalid-signature, mutated-body, and stale-event tests."},
+        {"id": "PAY-IDEMP-001", "severity": "critical", "blocking": true, "applies_when": {"all": ["payment.webhook"]}, "invariant": "Duplicate, delayed, replayed, and out-of-order operations preserve exactly-once business invariants.", "required_verification": "Duplicate-event and idempotency regression tests."},
+        {"id": "PAY-PRIV-001", "severity": "critical", "blocking": true, "applies_when": {"any": ["payment.refund", "payment.payout", "high_impact.transaction"]}, "invariant": "Refund, payout, destination, and pricing operations enforce server-side authority and risk controls.", "required_verification": "Wrong-role, stale-session, ownership, and limit tests."},
+        {"id": "PAY-SECRET-001", "severity": "critical", "blocking": true, "invariant": "Payment credentials remain server-only and least-privileged.", "required_verification": "Build artifact, configuration, and log inspection without values."}
+      ]
+    },
+    {
+      "id": "privacy-pii",
+      "claim": "data.pii",
+      "dependencies": [],
+      "reference": "packs/privacy-pii.md",
+      "activation": "Personal identifiers, user documents, person-linked telemetry, regulated data, or processor egress.",
+      "controls": [
+        {"id": "PII-INV-001", "severity": "high", "blocking": false, "invariant": "Personal-data flows are inventoried from collection through deletion.", "required_verification": "Schema, route, configuration, and processor-linked data-flow artifact."},
+        {"id": "PII-MIN-001", "severity": "high", "blocking": false, "invariant": "Collection, return, logging, and egress use the narrowest necessary fields and audience.", "required_verification": "Projection and sink tests."},
+        {"id": "PII-ACCESS-001", "severity": "critical", "blocking": true, "invariant": "Personal-data operations consistently enforce subject, tenant, and role authority.", "required_verification": "Wrong-subject and wrong-role negative tests."},
+        {"id": "PII-RET-001", "severity": "high", "blocking": false, "invariant": "Retention and deletion cover every applicable store and processor.", "required_verification": "Lifecycle test or evidence-backed procedure."},
+        {"id": "PII-LOG-001", "severity": "high", "blocking": false, "invariant": "Observability and support sinks exclude unnecessary personal data.", "required_verification": "Representative success and failure sink inspection."},
+        {"id": "PII-PROC-001", "severity": "high", "blocking": false, "invariant": "Processor egress is minimized, intentional, access-controlled, and inventoried.", "required_verification": "Outbound payload and processor-list inspection."},
+        {"id": "PII-RIGHTS-001", "severity": "critical", "blocking": true, "invariant": "Export and deletion are complete, authorized, and subject-isolated.", "required_verification": "Cross-user export/delete tests and lifecycle coverage."},
+        {"id": "PII-FANOUT-001", "severity": "critical", "blocking": true, "invariant": "Bulk relationship and sharing graphs cannot amplify one compromised account into unauthorized data fan-out.", "required_verification": "Graph-neighbor authorization, rate, anomaly, and response-minimization tests."}
+      ]
+    },
+    {
+      "id": "multi-tenant",
+      "claim": "architecture.multi_tenant",
+      "dependencies": ["auth-session"],
+      "reference": "packs/multi-tenant.md",
+      "activation": "Tenant, organization, workspace, account boundary, shared infrastructure, or cross-tenant support access.",
+      "controls": [
+        {"id": "TEN-CTX-001", "severity": "critical", "blocking": true, "invariant": "Tenant context derives from authenticated server-side scope.", "required_verification": "Tenant substitution negative test."},
+        {"id": "TEN-DB-001", "severity": "critical", "blocking": true, "invariant": "Every tenant-owned database operation is scoped.", "required_verification": "Cross-tenant tests and query or policy inspection."},
+        {"id": "TEN-CACHE-001", "severity": "critical", "blocking": true, "invariant": "Cache identity and invalidation preserve tenant scope.", "required_verification": "Same-key cross-tenant test."},
+        {"id": "TEN-STORE-001", "severity": "critical", "blocking": true, "invariant": "Object storage and presigned operations bind tenant ownership.", "required_verification": "Cross-tenant presign and download tests."},
+        {"id": "TEN-ASYNC-001", "severity": "critical", "blocking": true, "invariant": "Queues, jobs, exports, and events preserve and revalidate tenant scope.", "required_verification": "Cross-tenant job or event mutation test."},
+        {"id": "TEN-SEARCH-001", "severity": "critical", "blocking": true, "invariant": "Search, analytics, and vector retrieval apply non-overridable tenant filters before ranking.", "required_verification": "Missing-filter and filter-tampering tests."},
+        {"id": "TEN-ADMIN-001", "severity": "critical", "blocking": true, "applies_when": {"any": ["web.admin_surface", "support.impersonation", "support.bulk_access"]}, "invariant": "Cross-tenant administration is explicit, least-privileged, step-up protected, and attributable.", "required_verification": "Unauthorized support-role, missing-reason, and audit tests."}
+      ]
+    },
+    {
+      "id": "api-inbound",
+      "claim": "capabilities.api_inbound",
+      "dependencies": ["baseline-web"],
+      "reference": "packs/api-inbound.md",
+      "activation": "REST, GraphQL, gRPC, webhook, or public/internal service endpoint.",
+      "controls": [
+        {"id": "API-OBJ-001", "severity": "critical", "blocking": true, "invariant": "Every object operation authorizes the current principal and scope.", "required_verification": "Wrong-owner object test."},
+        {"id": "API-FUNC-001", "severity": "critical", "blocking": true, "invariant": "Functions and administrative actions enforce server-side capability authorization.", "required_verification": "Wrong-role function test."},
+        {"id": "API-PROP-001", "severity": "high", "blocking": false, "invariant": "Readable and writable properties are allowlisted.", "required_verification": "Extra-field write and response-minimization tests."},
+        {"id": "API-SCHEMA-001", "severity": "high", "blocking": false, "invariant": "Boundary schemas reject malformed, ambiguous, oversized, and unexpected input.", "required_verification": "Invalid type, shape, and size tests."},
+        {"id": "API-BUDGET-001", "severity": "high", "blocking": false, "invariant": "Expensive resources and sensitive workflows have bounded rate, concurrency, and cost.", "required_verification": "Limit-exceeded behavior test."},
+        {"id": "API-TOKEN-001", "severity": "critical", "blocking": true, "applies_when": {"all": ["auth.api_token"]}, "invariant": "API credentials validate issuer, audience, signature, expiry, type, and required scope.", "required_verification": "Wrong audience, scope, and token-type tests."},
+        {"id": "API-INV-001", "severity": "medium", "blocking": false, "invariant": "Deployed routes and versions are inventoried and obsolete endpoints are absent.", "required_verification": "Runtime route-to-inventory comparison."}
+      ]
+    },
+    {
+      "id": "external-api",
+      "claim": "integrations.external_api",
+      "dependencies": [],
+      "reference": "packs/external-api.md",
+      "activation": "Outbound provider SDK, user-influenced fetch, callback, or third-party transfer.",
+      "controls": [
+        {"id": "EXT-DEST-001", "severity": "critical", "blocking": true, "applies_when": {"all": ["external.user_controlled_destination"]}, "invariant": "Outbound destinations resist SSRF, redirects, rebinding, and alternate address forms.", "required_verification": "Loopback, private, link-local, and redirect tests where applicable."},
+        {"id": "EXT-SECRET-001", "severity": "critical", "blocking": true, "invariant": "Provider credentials remain least-scoped, server-side, and intentionally rotatable.", "required_verification": "Configuration and outbound-header inspection without values."},
+        {"id": "EXT-TIME-001", "severity": "high", "blocking": false, "invariant": "Timeouts, retries, concurrency, and response sizes are bounded and operation-safe.", "required_verification": "Timeout, retry, oversize, and partial-failure tests."},
+        {"id": "EXT-SCHEMA-001", "severity": "high", "blocking": false, "invariant": "Provider responses remain untrusted until validated.", "required_verification": "Malformed and unexpected response tests."},
+        {"id": "EXT-EGRESS-001", "severity": "high", "blocking": false, "invariant": "Outbound payloads exclude credentials, debug context, and unnecessary personal data.", "required_verification": "Success and failure payload or log inspection."},
+        {"id": "EXT-FAIL-001", "severity": "high", "blocking": false, "invariant": "Provider outages, duplicates, and partial success preserve local invariants.", "required_verification": "Controlled outage and replay tests."},
+        {"id": "EXT-TLS-001", "severity": "critical", "blocking": true, "invariant": "Production clients verify TLS without insecure overrides.", "required_verification": "Effective client configuration inspection."}
+      ]
+    },
+    {
+      "id": "file-upload",
+      "claim": "capabilities.file_upload",
+      "dependencies": [],
+      "reference": "packs/file-upload.md",
+      "activation": "Multipart input, object upload, presigned upload, or user-controlled file processing.",
+      "controls": [
+        {"id": "UPL-TYPE-001", "severity": "high", "blocking": false, "invariant": "Allowed types are explicit and verified from multiple signals as appropriate.", "required_verification": "Mismatch and disallowed-type tests."},
+        {"id": "UPL-NAME-001", "severity": "high", "blocking": false, "invariant": "Server-generated names prevent traversal, overwrite, reserved-name, and normalization attacks.", "required_verification": "Traversal, collision, and normalization tests."},
+        {"id": "UPL-SIZE-001", "severity": "high", "blocking": false, "invariant": "Compressed and expanded work is bounded before expensive processing.", "required_verification": "Oversize, archive-bomb, and timeout tests."},
+        {"id": "UPL-STORE-001", "severity": "critical", "blocking": true, "invariant": "New uploads are non-public and isolated until policy checks complete.", "required_verification": "Public ACL and direct URL tests."},
+        {"id": "UPL-PROC-001", "severity": "critical", "blocking": true, "invariant": "Parsers and converters run with proportionate isolation and least privilege.", "required_verification": "Malformed parser input and sandbox assertion."},
+        {"id": "UPL-DOWN-001", "severity": "critical", "blocking": true, "invariant": "Download and presign operations recheck ownership and authorization.", "required_verification": "Wrong-user and wrong-tenant tests."},
+        {"id": "UPL-SCAN-001", "severity": "high", "blocking": false, "invariant": "Required malware or CDR checks fail closed on scanner errors and timeouts.", "required_verification": "Positive, error, and timeout scanner-path tests."}
+      ]
+    },
+    {
+      "id": "ai-rag-agent",
+      "claim": "capabilities.ai_rag_agent",
+      "dependencies": ["external-api"],
+      "reference": "packs/ai-rag-agent.md",
+      "activation": "LLM provider, RAG/vector search, model serving, tools/MCP, memory, or autonomous action.",
+      "controls": [
+        {"id": "AIR-DATA-001", "severity": "high", "blocking": false, "invariant": "AI context, traces, and provider requests exclude unnecessary secrets and personal data.", "required_verification": "Representative egress and observability inspection."},
+        {"id": "AIR-INJECT-001", "severity": "critical", "blocking": true, "invariant": "Untrusted retrieved or tool content cannot change system authority or policy.", "required_verification": "Indirect-injection tests through every active untrusted channel."},
+        {"id": "AIR-RAG-001", "severity": "critical", "blocking": true, "applies_when": {"all": ["ai.rag"]}, "invariant": "Retrieval authorizes source, tenant, and subject before ranking and preserves provenance.", "required_verification": "Cross-tenant or subject retrieval and poisoned-document tests."},
+        {"id": "AIR-TOOL-001", "severity": "critical", "blocking": true, "applies_when": {"all": ["ai.tools"]}, "invariant": "Tools use explicit schemas, least privilege, server authorization, bounded arguments, and approvals.", "required_verification": "Unauthorized, extra-argument, and approval-bypass tests."},
+        {"id": "AIR-MEM-001", "severity": "critical", "blocking": true, "applies_when": {"all": ["ai.memory"]}, "invariant": "Memory is scoped, integrity-protected, retention-bounded, and resistant to cross-user poisoning.", "required_verification": "Cross-user or tenant and persistence-poisoning tests."},
+        {"id": "AIR-OUT-001", "severity": "high", "blocking": false, "invariant": "Model output is validated before sensitive interpretation or execution.", "required_verification": "Malicious structured-output and rendering or tool tests."},
+        {"id": "AIR-AUTO-001", "severity": "critical", "blocking": true, "applies_when": {"all": ["ai.autonomous_action"]}, "invariant": "Autonomous actions have budgets, limits, checkpoints, audit, and approval at irreversible boundaries.", "required_verification": "Budget, limit, approval, and rollback behavior tests."}
+      ]
+    },
+    {
+      "id": "secrets-management",
+      "claim": "authority.secrets_plane",
+      "dependencies": [],
+      "reference": "packs/secrets-management.md",
+      "activation": "A product or platform stores, serves, rotates, exports, or administers credentials and secret material.",
+      "controls": [
+        {"id": "SECRET-STORE-001", "severity": "critical", "blocking": true, "invariant": "Secret values are encrypted with separated key authority and never persist in plaintext.", "required_verification": "Storage, envelope-encryption, backup, and plaintext-negative inspection."},
+        {"id": "SECRET-READ-001", "severity": "critical", "blocking": true, "invariant": "Every secret read is explicitly authorized and narrowly disclosed.", "required_verification": "Wrong-principal, wrong-scope, and list-versus-value tests."},
+        {"id": "SECRET-BULK-001", "severity": "critical", "blocking": true, "invariant": "Bulk read, export, backup, and migration paths cannot bypass per-secret authority and limits.", "required_verification": "Bulk export authorization, volume-limit, and anomaly tests."},
+        {"id": "SECRET-SCOPE-001", "severity": "critical", "blocking": true, "invariant": "Secret identity is bound to tenant, environment, workload, and purpose.", "required_verification": "Cross-tenant, environment, and workload substitution tests."},
+        {"id": "SECRET-ROTATE-001", "severity": "high", "blocking": false, "invariant": "Rotation is supported without unsafe value disclosure or uncontrolled downtime.", "required_verification": "Rotation, overlap-window, and rollback tests."},
+        {"id": "SECRET-CASCADE-001", "severity": "critical", "blocking": true, "invariant": "Compromise of one credential cannot silently unlock unrelated providers or control planes.", "required_verification": "Blast-radius graph review and lateral-use negative tests."},
+        {"id": "SECRET-DETECT-001", "severity": "high", "blocking": false, "invariant": "Secret exposure signals trigger containment and rotation workflows.", "required_verification": "Canary exposure or alert-pipeline test without live secret disclosure."},
+        {"id": "SECRET-AUDIT-001", "severity": "high", "blocking": false, "invariant": "Secret reads and administration are attributable without logging values.", "required_verification": "Read, denial, export, and rotation audit assertions."}
+      ]
+    },
+    {
+      "id": "cloud-iam-controlplane",
+      "claim": "authority.cloud_control_plane",
+      "dependencies": ["secrets-management"],
+      "reference": "packs/cloud-iam-controlplane.md",
+      "activation": "Repository code or infrastructure manages cloud identity, policy, network, organization, or account control planes.",
+      "controls": [
+        {"id": "IAM-ADMIN-001", "severity": "critical", "blocking": true, "invariant": "Human cloud administration is phishing-resistant, just-in-time, and separated from daily identity.", "required_verification": "Identity, MFA, elevation, and break-glass policy evidence."},
+        {"id": "IAM-SVC-001", "severity": "critical", "blocking": true, "invariant": "Workloads use short-lived, audience-bound, least-privileged identities.", "required_verification": "Effective service policy and credential-lifetime tests."},
+        {"id": "IAM-LATERAL-001", "severity": "critical", "blocking": true, "invariant": "Role assumption, delegation, and organization trust block unintended lateral movement.", "required_verification": "Trust-policy graph and unauthorized assumption tests."},
+        {"id": "IAM-AUDIT-001", "severity": "high", "blocking": false, "invariant": "Control-plane and identity changes are immutable, attributable, and monitored.", "required_verification": "Audit sink, denial, and privileged-change alert tests."},
+        {"id": "IAM-NET-001", "severity": "critical", "blocking": true, "invariant": "Management and metadata endpoints are reachable only from intended identities and networks.", "required_verification": "Network policy, metadata, and management-plane reachability tests."}
+      ]
+    },
+    {
+      "id": "cicd-supply-chain",
+      "claim": "delivery.cicd_supply_chain",
+      "dependencies": [],
+      "reference": "packs/cicd-supply-chain.md",
+      "activation": "CI workflows, build automation, package publication, deployment identity, or artifact provenance.",
+      "controls": [
+        {"id": "CICD-ACTION-001", "severity": "critical", "blocking": true, "invariant": "Third-party build actions and includes are immutable and reviewed.", "required_verification": "Full-commit pin and source-owner policy check."},
+        {"id": "CICD-TOKEN-001", "severity": "critical", "blocking": true, "invariant": "Workflow tokens default to read-only and jobs receive only required permissions.", "required_verification": "Effective job permission assertion."},
+        {"id": "CICD-PR-001", "severity": "critical", "blocking": true, "applies_when": {"all": ["cicd.untrusted_pr"]}, "invariant": "Untrusted forks and pull requests cannot access secrets or privileged runners.", "required_verification": "Fork PR secret and runner-isolation tests."},
+        {"id": "CICD-INJECT-001", "severity": "critical", "blocking": true, "invariant": "Untrusted branch, issue, matrix, and event data cannot become shell or workflow code.", "required_verification": "Workflow-expression injection tests."},
+        {"id": "CICD-OIDC-001", "severity": "critical", "blocking": true, "applies_when": {"all": ["cicd.oidc"]}, "invariant": "Deployments prefer short-lived identity bound to repository, ref, workflow, and environment.", "required_verification": "OIDC subject/audience and environment protection tests."},
+        {"id": "CICD-PUBLISH-001", "severity": "critical", "blocking": true, "applies_when": {"all": ["cicd.package_publish"]}, "invariant": "Package and registry publication uses narrowly scoped trusted publishing or tokens.", "required_verification": "Publisher identity, scope, and protected-environment assertion."},
+        {"id": "CICD-EGRESS-001", "severity": "high", "blocking": false, "invariant": "Sensitive build jobs have bounded network egress and cannot exfiltrate credentials silently.", "required_verification": "Build network policy and canary egress test."},
+        {"id": "CICD-PROV-001", "severity": "high", "blocking": false, "invariant": "Source, dependencies, build identity, and released artifact are linked by verifiable provenance.", "required_verification": "Lock, SBOM, provenance, signature, and artifact-digest verification."}
+      ]
+    },
+    {
+      "id": "third-party-saas-oauth",
+      "claim": "integrations.saas_oauth",
+      "dependencies": ["auth-session", "external-api"],
+      "reference": "packs/third-party-saas-oauth.md",
+      "activation": "Connected SaaS apps, delegated OAuth grants, tenant-wide integrations, or vendor data export.",
+      "controls": [
+        {"id": "SAAS-INV-001", "severity": "high", "blocking": false, "invariant": "Connected apps, grants, owners, tenants, and data access are inventoried.", "required_verification": "Runtime grant-to-owner inventory reconciliation."},
+        {"id": "SAAS-SCOPE-001", "severity": "critical", "blocking": true, "invariant": "Delegated scopes are the minimum required and tenant-wide consent is explicit.", "required_verification": "Scope-downgrade and consent-path tests."},
+        {"id": "SAAS-TOKEN-001", "severity": "critical", "blocking": true, "invariant": "OAuth tokens are encrypted, tenant-bound, short-lived where possible, and excluded from logs.", "required_verification": "Storage, refresh, tenant-substitution, and logging tests."},
+        {"id": "SAAS-REVOKE-001", "severity": "high", "blocking": false, "invariant": "Disconnect, user removal, scope change, and incident response revoke grants and cached access.", "required_verification": "Revocation and stale-token tests."},
+        {"id": "SAAS-BLAST-001", "severity": "critical", "blocking": true, "invariant": "Vendor or connected-app compromise has bounded tenant and data blast radius.", "required_verification": "Trust-boundary graph and provider-compromise tabletop or isolation test."},
+        {"id": "SAAS-EXPORT-001", "severity": "critical", "blocking": true, "invariant": "Bulk third-party reads and exports are authorized, limited, attributable, and anomaly-detected.", "required_verification": "Bulk export, rate, cross-tenant, and anomaly tests."}
+      ]
+    },
+    {
+      "id": "support-admin-ops",
+      "claim": "operations.support_admin",
+      "dependencies": ["auth-session", "api-inbound"],
+      "reference": "packs/support-admin-ops.md",
+      "activation": "Support consoles, impersonation, customer data export, cross-tenant operations, or privileged operational access.",
+      "controls": [
+        {"id": "ADMIN-JIT-001", "severity": "critical", "blocking": true, "invariant": "Privileged support access is just-in-time, least-privileged, and time-bounded.", "required_verification": "Elevation approval, expiry, and post-expiry denial tests."},
+        {"id": "ADMIN-REASON-001", "severity": "high", "blocking": false, "invariant": "Sensitive support operations require a case-linked reason before access.", "required_verification": "Missing, invalid, and closed-case reason tests."},
+        {"id": "ADMIN-BULK-001", "severity": "critical", "blocking": true, "applies_when": {"all": ["support.bulk_access"]}, "invariant": "Bulk reads, searches, and mutations have strict volume and velocity limits.", "required_verification": "Bulk-limit and scripted-enumeration tests."},
+        {"id": "ADMIN-MASK-001", "severity": "high", "blocking": false, "invariant": "Admin interfaces reveal the minimum fields and mask sensitive values by default.", "required_verification": "Role-based field projection and reveal-action tests."},
+        {"id": "ADMIN-DUAL-001", "severity": "critical", "blocking": true, "applies_when": {"any": ["support.bulk_access", "high_impact.transaction"]}, "invariant": "Irreversible or broad-impact operations require independent approval.", "required_verification": "Self-approval and approval-replay tests."},
+        {"id": "ADMIN-IMPERSONATE-001", "severity": "critical", "blocking": true, "applies_when": {"all": ["support.impersonation"]}, "invariant": "Impersonation is explicit, short-lived, visibly marked, constrained, and non-transferable.", "required_verification": "Privilege, expiry, session-fixation, and prohibited-action tests."},
+        {"id": "ADMIN-EXPORT-001", "severity": "critical", "blocking": true, "applies_when": {"all": ["support.bulk_access"]}, "invariant": "Customer exports are scoped, approved, encrypted, expiring, and attributable.", "required_verification": "Wrong-tenant, expiry, download, and export-volume tests."},
+        {"id": "ADMIN-AUDIT-001", "severity": "critical", "blocking": true, "invariant": "Support access records actor, customer, reason, fields, action, and outcome in tamper-resistant audit.", "required_verification": "Success, denial, and audit-integrity assertions."},
+        {"id": "ADMIN-SESSION-001", "severity": "critical", "blocking": true, "invariant": "Admin sessions use stronger assurance, device controls, short lifetime, and revocation.", "required_verification": "Stale, weak-assurance, revoked, and device-policy tests."},
+        {"id": "ADMIN-ANOMALY-001", "severity": "high", "blocking": false, "invariant": "Unusual customer access, export, and privilege patterns trigger response.", "required_verification": "Detection rule and alert-delivery tests."},
+        {"id": "ADMIN-ARTIFACT-001", "severity": "high", "blocking": false, "invariant": "Support attachments and diagnostic artifacts are sanitized, access-controlled, and retention-bounded.", "required_verification": "Artifact access, active-content, and expiry tests."}
+      ]
+    },
+    {
+      "id": "high-impact-transactions",
+      "claim": "authority.high_impact_transactions",
+      "dependencies": ["auth-session"],
+      "reference": "packs/high-impact-transactions.md",
+      "activation": "Payout, bank or wallet change, domain transfer, credential reset, role escalation, destructive action, or other irreversible high-impact transaction.",
+      "controls": [
+        {"id": "HIT-INTENT-001", "severity": "critical", "blocking": true, "invariant": "Authorization binds the actor's intent to the exact action, target, amount, and recipient.", "required_verification": "Target, amount, recipient, and action substitution tests."},
+        {"id": "HIT-STATE-001", "severity": "critical", "blocking": true, "invariant": "Sensitive transaction parameters derive from fresh trusted server state.", "required_verification": "Client-field and stale-state tampering tests."},
+        {"id": "HIT-STEPUP-001", "severity": "critical", "blocking": true, "invariant": "High-impact execution requires fresh, phishing-resistant authentication proportionate to risk.", "required_verification": "Stale-session and weak-factor rejection tests."},
+        {"id": "HIT-CONFIRM-001", "severity": "critical", "blocking": true, "invariant": "Confirmation is independent, specific, understandable, and cannot be silently rewritten.", "required_verification": "Confirmation-content and channel-confusion tests."},
+        {"id": "HIT-RECIPIENT-001", "severity": "critical", "blocking": true, "invariant": "New or changed recipients receive additional validation and visible cooling signals.", "required_verification": "Recipient substitution and recent-change tests."},
+        {"id": "HIT-LIMIT-001", "severity": "critical", "blocking": true, "invariant": "Per-action, actor, tenant, recipient, time, and value limits cap blast radius.", "required_verification": "Cumulative, concurrent, and threshold tests."},
+        {"id": "HIT-COOL-001", "severity": "high", "blocking": false, "invariant": "Risky changes and transactions use a cancellable delay where immediate execution is unnecessary.", "required_verification": "Cooldown, cancellation, and bypass tests."},
+        {"id": "HIT-DUAL-001", "severity": "critical", "blocking": true, "invariant": "Broad or exceptional transactions require an independent approver.", "required_verification": "Self-approval, collusion boundary, and replay tests."},
+        {"id": "HIT-AUDIT-001", "severity": "critical", "blocking": true, "invariant": "Attempt, approval, execution, cancellation, and outcome are tamper-resistant and attributable.", "required_verification": "Lifecycle audit and integrity assertions."},
+        {"id": "HIT-REPLAY-001", "severity": "critical", "blocking": true, "invariant": "Requests and approvals are single-use, expiry-bound, and idempotent.", "required_verification": "Duplicate, delayed, parallel, and approval-replay tests."}
+      ]
+    }
+  ]
+}

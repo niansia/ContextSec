@@ -1,0 +1,30 @@
+{
+  "schema_version": "0.1.0",
+  "id": "zeabur-environment-variable-access-2026",
+  "event_date": "2026-08-28",
+  "title": "Zeabur unauthorized access to project environment-variable data",
+  "investigation_status": "ongoing",
+  "sources": [
+    {"publisher": "Zeabur Status", "url": "https://status.zeabur.com/incident/1037896?mp=true", "source_date": "2026-08-29"}
+  ],
+  "confirmed_facts": [
+    "Zeabur reported that a leaked internal AWS administrative credential was used to access its shared Tokyo AWS cluster.",
+    "Zeabur reported subsequent VPN access to its control-plane network and access to its primary database.",
+    "Zeabur identified targeted queries and exports involving customer environment variables and reported that directly usable AI and other service credentials appeared to be targeted.",
+    "Zeabur revoked and rotated known affected credentials while a third-party forensic investigation remained in progress."
+  ],
+  "inferences": [
+    "The public update supports reviewing secret bulk-read boundaries, cloud IAM lateral movement, and rotation blast radius; it does not yet establish the complete root cause or full data-access scope.",
+    "No assertion is made here that a specific ContextSec control was absent in Zeabur's implementation."
+  ],
+  "failure_patterns": ["long-lived administrative credential exposure", "cloud-to-control-plane lateral movement", "bulk secret-plane query and export", "downstream credential cascade and rotation burden"],
+  "trust_boundaries": ["AWS administrative identity to shared cluster", "cluster to control-plane VPN", "control-plane network to primary database", "environment-variable store to third-party providers"],
+  "contexts": ["secrets-management", "cloud-iam-controlplane", "multi-tenant", "external-api"],
+  "controls": ["SECRET-BULK-001", "SECRET-SCOPE-001", "SECRET-CASCADE-001", "SECRET-ROTATE-001", "SECRET-AUDIT-001", "IAM-ADMIN-001", "IAM-LATERAL-001", "IAM-AUDIT-001"],
+  "control_hypotheses": [
+    "A secret platform needs a first-class bulk-access invariant in addition to ordinary at-rest encryption.",
+    "Credential containment must model transitive authority from cloud IAM through internal networks to customer secret stores.",
+    "Incident regression should verify both revocation of the entry credential and cascade rotation of downstream credentials."
+  ],
+  "regression": {"fixture": "tests/fixtures/secret-plane", "expected_routes": ["secrets-management"], "mutation": "Introduce a batch secret export with no tenant/workload predicate or volume ceiling and require SECRET-BULK-001 to fail."}
+}

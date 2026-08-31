@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contextsec.dev/schemas/compositions-0.2.1.json",
+  "title": "ContextSec composition catalog",
+  "type": "object",
+  "required": ["schema_version", "rules"],
+  "properties": {
+    "schema_version": {"const": "0.2.1"},
+    "rules": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "requires", "intersection_capability", "severity", "blocking", "invariant", "required_verification"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^COMP-[A-Z]+-[A-Z]+-[0-9]{3}$"},
+          "requires": {"type": "array", "minItems": 2, "uniqueItems": true, "items": {"type": "string", "pattern": "^[a-z][a-z0-9-]+$"}},
+          "intersection_capability": {"type": "string", "pattern": "^flow\\.[a-z][a-z0-9_.-]+$"},
+          "severity": {"enum": ["critical", "high", "medium", "low", "info"]},
+          "blocking": {"type": "boolean"},
+          "invariant": {"type": "string", "minLength": 1},
+          "required_verification": {"type": "string", "minLength": 1}
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

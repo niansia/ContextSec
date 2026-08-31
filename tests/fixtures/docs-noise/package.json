@@ -1,0 +1,8 @@
+{
+  "name": "docs-noise-fixture",
+  "private": true,
+  "devDependencies": {
+    "openai": "5.0.0",
+    "stripe": "18.0.0"
+  }
+}

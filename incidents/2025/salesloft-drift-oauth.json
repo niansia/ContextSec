@@ -1,0 +1,27 @@
+{
+  "schema_version": "0.1.0",
+  "id": "salesloft-drift-oauth-2025",
+  "event_date": "2025-08-01",
+  "title": "Salesloft Drift OAuth token abuse against Salesforce tenants",
+  "investigation_status": "published",
+  "sources": [
+    {"publisher": "Google Cloud Mandiant", "url": "https://cloud.google.com/security/report/resources/cloud-threat-horizons-report-h1-2026", "source_date": "2026-02-24"}
+  ],
+  "confirmed_facts": [
+    "Google Cloud reported that UNC6395 used compromised OAuth tokens associated with Salesloft Drift for discovery and bulk exfiltration from Salesforce tenants.",
+    "Google Cloud characterized the activity as high-volume API access and silent bulk customer-data export."
+  ],
+  "inferences": [
+    "Connected SaaS applications require explicit vendor-compromise blast-radius and export controls beyond OAuth callback correctness."
+  ],
+  "failure_patterns": ["compromised delegated OAuth token", "trusted third-party relationship abuse", "high-volume API discovery", "silent cross-system bulk export"],
+  "trust_boundaries": ["customer tenant to connected SaaS app", "OAuth grant to Salesforce API", "SaaS token holder to bulk customer data"],
+  "contexts": ["third-party-saas-oauth", "privacy-pii", "external-api"],
+  "controls": ["SAAS-INV-001", "SAAS-SCOPE-001", "SAAS-TOKEN-001", "SAAS-REVOKE-001", "SAAS-BLAST-001", "SAAS-EXPORT-001", "COMP-SAA-PII-001"],
+  "control_hypotheses": [
+    "Token inventory and revocation must be tenant-aware and measurable for every connected app.",
+    "Bulk export controls need volume, velocity, field, tenant, and anomaly boundaries independent of a provider's nominal OAuth scope.",
+    "A vendor-compromise exercise should test rapid grant revocation and residual cached access."
+  ],
+  "regression": {"fixture": "tests/fixtures/saas-oauth", "expected_routes": ["third-party-saas-oauth"], "mutation": "Add a tenant-wide refresh token and unbounded bulk export with no inventory owner, rate ceiling, or revocation test."}
+}

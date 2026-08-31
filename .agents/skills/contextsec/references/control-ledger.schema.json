@@ -1,0 +1,133 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contextsec.dev/schemas/control-ledger-0.2.1.json",
+  "title": "ContextSec Control Evaluation Ledger",
+  "type": "object",
+  "required": ["schema_version", "evaluation_date", "subject", "active_compositions", "ledger", "summary", "gate", "limitations"],
+  "properties": {
+    "schema_version": {"const": "0.2.1"},
+    "evaluation_date": {"type": ["string", "null"], "format": "date"},
+    "subject": {
+      "type": "object",
+      "required": ["repository", "subject_revision", "source_inventory_digest", "decision_model_digest", "profile_coverage", "checker_coverage"],
+      "properties": {
+        "repository": {"type": "string", "minLength": 1},
+        "subject_revision": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+        "source_inventory_digest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+        "decision_model_digest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+        "profile_coverage": {"enum": ["complete", "partial"]},
+        "checker_coverage": {
+          "type": "object",
+          "required": ["traversal", "language_support", "checker_support", "match_enumeration"],
+          "properties": {
+            "traversal": {"enum": ["complete", "partial"]},
+            "language_support": {"enum": ["complete", "partial"]},
+            "checker_support": {"enum": ["complete", "partial"]},
+            "match_enumeration": {"enum": ["complete", "mixed_first_only", "first_only"]}
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "active_compositions": {"type": "array", "items": {"type": "string", "pattern": "^COMP-[A-Z]+-[A-Z]+-[0-9]{3}$"}, "uniqueItems": true},
+    "ledger": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["control_id", "source", "applicability", "verification", "severity", "blocking", "evidence_refs", "required_verification", "reason", "evaluation_sources", "waiver"],
+        "properties": {
+          "control_id": {"type": "string", "pattern": "^[A-Z]+(?:-[A-Z]+)+-[0-9]{3}$"},
+          "source": {"type": "object", "required": ["type", "id"], "properties": {"type": {"enum": ["pack", "composition"]}, "id": {"type": "string"}}, "additionalProperties": false},
+          "applicability": {"enum": ["required", "candidate", "not_applicable", "unknown"]},
+          "verification": {"enum": ["verified", "failed", "unknown", "waived"]},
+          "severity": {"enum": ["critical", "high", "medium", "low", "info"]},
+          "blocking": {"type": "boolean"},
+          "evidence_refs": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+          "required_verification": {"type": "string", "minLength": 1},
+          "reason": {"type": "string", "minLength": 1},
+          "evaluation_sources": {"type": "array", "items": {"enum": ["applicability", "supplied-evidence", "deterministic-check", "waiver"]}, "minItems": 1, "uniqueItems": true},
+          "waiver": {
+            "oneOf": [
+              {"type": "null"},
+              {
+                "type": "object",
+                "required": ["control_id", "owner", "reason", "compensating_control", "expires", "valid"],
+                "properties": {
+                  "control_id": {"type": "string", "pattern": "^[A-Z]+(?:-[A-Z]+)+-[0-9]{3}$"},
+                  "owner": {"type": "string", "minLength": 1},
+                  "reason": {"type": "string", "minLength": 1},
+                  "compensating_control": {"type": "string", "minLength": 1},
+                  "expires": {"type": "string", "format": "date"},
+                  "valid": {"type": "boolean"}
+                },
+                "additionalProperties": false
+              }
+            ]
+          }
+        },
+        "allOf": [
+          {
+            "if": {"properties": {"verification": {"enum": ["verified", "failed"]}}, "required": ["verification"]},
+            "then": {"properties": {"evidence_refs": {"minItems": 1}}}
+          },
+          {
+            "if": {"properties": {"verification": {"const": "waived"}}, "required": ["verification"]},
+            "then": {
+              "properties": {
+                "waiver": {"type": "object"},
+                "evaluation_sources": {"contains": {"const": "waiver"}}
+              }
+            }
+          }
+        ],
+        "additionalProperties": false
+      }
+    },
+    "summary": {
+      "type": "object",
+      "required": ["applicability", "verification", "total", "blocking_unresolved", "blocking_waived"],
+      "properties": {
+        "applicability": {
+          "type": "object",
+          "required": ["candidate", "not_applicable", "required", "unknown"],
+          "properties": {
+            "candidate": {"type": "integer", "minimum": 0},
+            "not_applicable": {"type": "integer", "minimum": 0},
+            "required": {"type": "integer", "minimum": 0},
+            "unknown": {"type": "integer", "minimum": 0}
+          },
+          "additionalProperties": false
+        },
+        "verification": {
+          "type": "object",
+          "required": ["failed", "unknown", "verified", "waived"],
+          "properties": {
+            "failed": {"type": "integer", "minimum": 0},
+            "unknown": {"type": "integer", "minimum": 0},
+            "verified": {"type": "integer", "minimum": 0},
+            "waived": {"type": "integer", "minimum": 0}
+          },
+          "additionalProperties": false
+        },
+        "total": {"type": "integer", "minimum": 0},
+        "blocking_unresolved": {"type": "integer", "minimum": 0},
+        "blocking_waived": {"type": "integer", "minimum": 0}
+      },
+      "additionalProperties": false
+    },
+    "gate": {
+      "type": "object",
+      "required": ["status", "reason", "blocking_controls", "waived_controls"],
+      "properties": {
+        "status": {"enum": ["PASS", "WARN", "BLOCK", "WAIVED"]},
+        "reason": {"type": "string", "minLength": 1},
+        "blocking_controls": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "waived_controls": {"type": "array", "items": {"type": "string"}, "uniqueItems": true}
+      },
+      "additionalProperties": false
+    },
+    "limitations": {"type": "array", "items": {"type": "string"}, "minItems": 1}
+  },
+  "additionalProperties": false
+}

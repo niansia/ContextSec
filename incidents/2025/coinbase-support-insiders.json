@@ -1,0 +1,29 @@
+{
+  "schema_version": "0.1.0",
+  "id": "coinbase-support-insiders-2025",
+  "event_date": "2025-05-15",
+  "title": "Coinbase customer-support insider data theft",
+  "investigation_status": "published",
+  "sources": [
+    {"publisher": "Coinbase", "url": "https://www.coinbase.com/en-nl/blog/protecting-our-customers-standing-up-to-extortionists", "source_date": "2025-05-15"}
+  ],
+  "confirmed_facts": [
+    "Coinbase reported that criminals bribed or recruited a small group of overseas support agents to copy customer data from support tools.",
+    "Coinbase reported exposure of identity, contact, masked financial, government-ID image, balance snapshot, transaction-history, and limited corporate data for a subset of customers.",
+    "Coinbase reported that login credentials, 2FA codes, private keys, and direct ability to move funds were not obtained through this access.",
+    "Coinbase added extra checks for large withdrawals on flagged accounts and described stronger support-operation controls and monitoring."
+  ],
+  "inferences": [
+    "Support access must be modeled as a product security plane even when it cannot directly move money, because exposed context can enable downstream social engineering."
+  ],
+  "failure_patterns": ["privileged support insider", "broad customer-data visibility", "support data used for targeted social engineering", "high-impact withdrawal risk following data theft"],
+  "trust_boundaries": ["support workforce to customer records", "support tool to document and transaction data", "exposed customer context to high-impact withdrawal flow"],
+  "contexts": ["support-admin-ops", "privacy-pii", "high-impact-transactions"],
+  "controls": ["ADMIN-JIT-001", "ADMIN-REASON-001", "ADMIN-MASK-001", "ADMIN-BULK-001", "ADMIN-AUDIT-001", "ADMIN-ANOMALY-001", "PII-MIN-001", "HIT-STEPUP-001", "HIT-RECIPIENT-001", "HIT-LIMIT-001"],
+  "control_hypotheses": [
+    "Support role design should minimize visible fields and distinguish masked display from authorized reveal.",
+    "Bulk and anomalous access controls should operate per agent, case, customer, field class, and time window.",
+    "Known data-exposure signals should raise transaction assurance without relying on the same support channel."
+  ],
+  "regression": {"fixture": "tests/fixtures/support-admin", "expected_routes": ["support-admin-ops"], "mutation": "Add unrestricted customer export or impersonation with no case reason, expiry, field projection, or anomaly event; compose separately with a high-impact withdrawal fixture."}
+}

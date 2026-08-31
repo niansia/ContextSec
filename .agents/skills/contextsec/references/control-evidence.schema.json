@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contextsec.dev/schemas/control-evidence-0.2.1.json",
+  "title": "ContextSec supplied control evidence and waivers",
+  "type": "object",
+  "required": ["schema_version", "subject_revision", "controls", "waivers"],
+  "properties": {
+    "schema_version": {"const": "0.2.1"},
+    "subject_revision": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
+    "controls": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["control_id", "applicability", "verification", "reason", "evidence_refs"],
+        "properties": {
+          "control_id": {"type": "string", "pattern": "^[A-Z]+(?:-[A-Z]+)+-[0-9]{3}$"},
+          "applicability": {"enum": ["required", "candidate", "not_applicable", "unknown"]},
+          "verification": {"enum": ["verified", "failed", "unknown"]},
+          "reason": {"type": "string", "minLength": 1},
+          "evidence_refs": {"type": "array", "items": {"type": "string", "minLength": 1}, "minItems": 1, "uniqueItems": true}
+        },
+        "allOf": [
+          {
+            "if": {"properties": {"applicability": {"const": "not_applicable"}}, "required": ["applicability"]},
+            "then": {"properties": {"verification": {"const": "unknown"}}}
+          }
+        ],
+        "additionalProperties": false
+      }
+    },
+    "waivers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["control_id", "owner", "reason", "compensating_control", "expires"],
+        "properties": {
+          "control_id": {"type": "string"},
+          "owner": {"type": "string", "minLength": 1},
+          "reason": {"type": "string", "minLength": 1},
+          "compensating_control": {"type": "string", "minLength": 1},
+          "expires": {"type": "string", "format": "date"}
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

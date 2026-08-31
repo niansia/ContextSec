@@ -1,0 +1,50 @@
+# Changelog
+
+## 0.3.0 — Benchmark and mutation proof
+
+- Added a 36-case fully labeled profile corpus with separate development and frozen maintainer-authored evaluation splits, per-pack confusion counts, macro/micro F1, safety-critical recall, capability annotations, and false-required activation counts.
+- Added eight baseline/mutant pairs covering every published deterministic checker shape; all mutations must change the expected finding state and control binding.
+- Added four manually reviewed public-repository cases pinned to immutable commits with license/provenance metadata and a local-checkout runner that verifies `HEAD` without cloning or executing target code.
+- Added conservative Python production-manifest evidence for PEP 621, Poetry, requirements, and Pipfile while excluding optional/dev and test/example manifests.
+- Added Python FastAPI/Django/Flask, PII model, tenant model, and authentication evidence; promoted supported generic HTTP routes to direct high-confidence API evidence.
+- Narrowed the RAG sub-capability detector after a real Stripe samples case exposed false `retrieve` matches.
+- Added path-safe temporary benchmark materialization, explicit metric claim boundaries, and separate benchmark methodology/real-repository documentation.
+- Expanded CI to Ubuntu and Windows across Python 3.11–3.14, retained dogfood and reproducible archive checks, and pinned the official Agent Skills reference validator to a full commit.
+
+## 0.2.1 — Applicability correctness and integrity hardening
+
+- Replaced universal comment masking with language-aware lexical policies; JavaScript decrement/private fields, Python f-string expressions, and MySQL hash comments retain their intended semantics.
+- Unified `scope_hash` as `subject_revision`, profiled once per evaluation, and reject mismatched Profile/Checks artifacts or mid-evaluation source changes through a shared source-inventory digest.
+- Added evidence-backed sub-capabilities and per-control `applies_when` conditions.
+- Split ledger applicability from verification so irrelevant controls cannot create false blockers.
+- Changed compositions from pack-co-occurrence activation to candidate-by-default, required-on-explicit-intersection semantics; unrelated same-file keywords cannot prove a flow.
+- Added strict catalog, profile, check, and ledger semantic validation, including exact object shapes, catalog-bound rows, recomputed summaries/gates, and non-boolean `blocking` rejection.
+- Made computed required applicability monotonic against supplied evidence and added active/expired/partial waiver lifecycle regressions.
+- Bound finding evidence to the current subject revision and reject decision-model mutation between profiling and ledger evaluation.
+- Prevented upload findings from matching inert template-literal prose.
+- Added a bounded JavaScript object-property scanner for equivalent public ACL syntax and a tenant-derived upload-key composition checker.
+- Made finding identity/digest relationships self-consistent and require artifact decision-model digests to match the live model.
+- Bound waiver ledgers to an explicit evaluation date and require release-date revalidation to prevent expired-artifact replay.
+- Rejected `verified`/`failed` ledger states without evidence references or consistent evaluation sources.
+- Added repository-aware `explain --repo` output.
+- Expanded the regression benchmark with control applicability, composition applicability, and gate annotations.
+- Standardized stored ZIP entries, platform/version metadata, permissions, timestamps, and LF checkout policy for byte-identical cross-platform packaging inputs.
+- Corrected the Zeabur incident map from delegated SaaS/OAuth to ordinary external API exposure.
+
+## 0.2.0 — Decision layer
+
+- Repositioned ContextSec around the question “which security controls does this product actually need?”
+- Added one machine-readable catalog with 16 product-risk packs and 116 controls.
+- Added six risk planes: secrets management, cloud IAM/control plane, CI/CD supply chain, third-party SaaS/OAuth, support/admin operations, and high-impact transactions.
+- Added nine cross-context composition controls.
+- Added a Control Evaluation Ledger and strict `PASS`, `WARN`, `BLOCK`, and expiry-bound `WAIVED` gate.
+- Split stable evidence/location identity from content digest, content-bound fingerprint, subject revision, and decision-model digest.
+- Fixed executable expressions inside JavaScript/TypeScript template literals while preserving literal decoy suppression.
+- Added narrow CI action-pin and token-permission checks.
+- Added a five-case official/first-party incident-to-control corpus.
+- Expanded the annotated routing benchmark to 13 scenarios and 65 decisions.
+- Added a deterministic, allowlisted source release packager.
+
+## 0.1.0 — Applicability proof
+
+- Added the canonical Agent Skill, offline repository profiler, explainable router, ten initial packs, five narrow control checks, semantic validators, composite demo, and adversarial fixtures.

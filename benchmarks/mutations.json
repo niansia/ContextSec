@@ -1,0 +1,103 @@
+{
+  "version": "0.3.0",
+  "method": "Each pair differs by one security-relevant edit. A mutation is killed only when the target finding is absent in the baseline, appears exactly once in the mutant with the expected status, and binds the expected control. This measures the eight published deterministic checker shapes, not all 116 catalog controls and not application test quality.",
+  "thresholds": {"minimum_kill_rate": 1.0},
+  "mutations": [
+    {
+      "id": "remove-tenant-query-predicate",
+      "checker_id": "TENANT-QUERY-001",
+      "expected_mutant_status": "failed",
+      "expected_control_ids": ["TEN-DB-001", "API-OBJ-001", "COMP-API-TEN-001"],
+      "baseline_files": {
+        "prisma/schema.prisma": "model Invoice {\n id String @id\n tenantId String\n}\n",
+        "app/api/invoices/route.ts": "export async function GET(req: NextRequest) { return prisma.invoice.findUnique({ where: { id, tenantId } }); }\n"
+      },
+      "mutant_files": {
+        "prisma/schema.prisma": "model Invoice {\n id String @id\n tenantId String\n}\n",
+        "app/api/invoices/route.ts": "export async function GET(req: NextRequest) { return prisma.invoice.findUnique({ where: { id } }); }\n"
+      }
+    },
+    {
+      "id": "add-whole-object-pii-log",
+      "checker_id": "PII-LOG-001",
+      "expected_mutant_status": "failed",
+      "expected_control_ids": ["PII-LOG-001", "FND-LOG-001"],
+      "baseline_files": {
+        "prisma/schema.prisma": "model User {\n id String @id\n email String\n}\n",
+        "src/user.ts": "const user = await prisma.user.findUnique({ where: { id } });\nreturn user?.id;\n"
+      },
+      "mutant_files": {
+        "prisma/schema.prisma": "model User {\n id String @id\n email String\n}\n",
+        "src/user.ts": "const user = await prisma.user.findUnique({ where: { id } });\nconsole.log(user);\nreturn user?.id;\n"
+      }
+    },
+    {
+      "id": "remove-ai-egress-projection",
+      "checker_id": "AI-PII-EGRESS-001",
+      "expected_mutant_status": "failed",
+      "expected_control_ids": ["PII-PROC-001", "EXT-EGRESS-001", "AIR-DATA-001", "COMP-AI-PII-001"],
+      "baseline_files": {
+        "package.json": "{\"dependencies\":{\"openai\":\"5\"}}\n",
+        "prisma/schema.prisma": "model User {\n id String @id\n email String\n}\n",
+        "src/ask.ts": "const user = await prisma.user.findUnique({ where: { id }, select: { id: true } });\nreturn client.responses.create({ input: JSON.stringify(user), model: 'gpt' });\n"
+      },
+      "mutant_files": {
+        "package.json": "{\"dependencies\":{\"openai\":\"5\"}}\n",
+        "prisma/schema.prisma": "model User {\n id String @id\n email String\n}\n",
+        "src/ask.ts": "const user = await prisma.user.findUnique({ where: { id } });\nreturn client.responses.create({ input: JSON.stringify(user), model: 'gpt' });\n"
+      }
+    },
+    {
+      "id": "make-upload-public",
+      "checker_id": "UPLOAD-PUBLIC-001",
+      "expected_mutant_status": "failed",
+      "expected_control_ids": ["UPL-STORE-001"],
+      "baseline_files": {"src/upload.ts": "const command = new PutObjectCommand({ Bucket, Key, Body, ACL: 'private' });\n"},
+      "mutant_files": {"src/upload.ts": "const command = new PutObjectCommand({ Bucket, Key, Body, ACL: 'public-read' });\n"}
+    },
+    {
+      "id": "add-tenant-derived-upload-key",
+      "checker_id": "UPLOAD-TENANT-FLOW-001",
+      "expected_mutant_status": "unknown",
+      "expected_control_ids": ["COMP-UPL-TEN-001"],
+      "baseline_files": {
+        "prisma/schema.prisma": "model Tenant { id String @id files File[] }\nmodel File { id String @id tenantId String }\n",
+        "src/upload.ts": "const command = new PutObjectCommand({ Bucket, Key: fileName, Body });\n"
+      },
+      "mutant_files": {
+        "prisma/schema.prisma": "model Tenant { id String @id files File[] }\nmodel File { id String @id tenantId String }\n",
+        "src/upload.ts": "const command = new PutObjectCommand({ Bucket, Key: `${tenantId}/${fileName}`, Body });\n"
+      }
+    },
+    {
+      "id": "remove-webhook-deduplication",
+      "checker_id": "PAYMENT-IDEMPOTENCY-001",
+      "expected_mutant_status": "unknown",
+      "expected_control_ids": ["PAY-IDEMP-001"],
+      "baseline_files": {
+        "package.json": "{\"dependencies\":{\"stripe\":\"18\"}}\n",
+        "app/api/stripe/webhook/route.ts": "export async function POST(req: NextRequest) { const event = stripe.webhooks.constructEvent(await req.text(), sig, secret); await processedEvent.upsert({id:event.id}); }\n"
+      },
+      "mutant_files": {
+        "package.json": "{\"dependencies\":{\"stripe\":\"18\"}}\n",
+        "app/api/stripe/webhook/route.ts": "export async function POST(req: NextRequest) { const event = stripe.webhooks.constructEvent(await req.text(), sig, secret); await fulfill(event); }\n"
+      }
+    },
+    {
+      "id": "replace-action-sha-with-tag",
+      "checker_id": "CICD-ACTION-PIN-001",
+      "expected_mutant_status": "failed",
+      "expected_control_ids": ["CICD-ACTION-001"],
+      "baseline_files": {".github/workflows/ci.yml": "permissions: {}\njobs:\n  test:\n    steps:\n      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803\n"},
+      "mutant_files": {".github/workflows/ci.yml": "permissions: {}\njobs:\n  test:\n    steps:\n      - uses: actions/checkout@v6\n"}
+    },
+    {
+      "id": "remove-workflow-permissions",
+      "checker_id": "CICD-PERMISSIONS-001",
+      "expected_mutant_status": "unknown",
+      "expected_control_ids": ["CICD-TOKEN-001"],
+      "baseline_files": {".github/workflows/ci.yml": "permissions: {}\njobs:\n  test:\n    steps:\n      - run: python -m unittest\n"},
+      "mutant_files": {".github/workflows/ci.yml": "jobs:\n  test:\n    steps:\n      - run: python -m unittest\n"}
+    }
+  ]
+}
