@@ -32,8 +32,8 @@
         "type": "object",
         "required": ["id", "repository", "commit", "profile"],
         "properties": {
-          "id": {"type": "string", "minLength": 1},
-          "repository": {"type": "string", "minLength": 1},
+          "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"},
+          "repository": {"type": "string", "pattern": "^https://github\\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"},
           "commit": {"type": "string", "pattern": "^[a-f0-9]{40}$"},
           "profile": {"$ref": "https://raw.githubusercontent.com/niansia/ContextSec/v0.4.0/.agents/skills/contextsec/references/security-profile.schema.json"}
         },

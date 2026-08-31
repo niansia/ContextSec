@@ -244,7 +244,11 @@ def evaluate(
         if not isinstance(case, dict) or set(case) != {"id", "repository", "commit", "profile"}:
             raise ValueError("Holdout prediction case has an invalid shape.")
         case_id = case.get("id")
-        if not isinstance(case_id, str) or not case_id or case_id in predicted_by_id:
+        if (
+            not isinstance(case_id, str)
+            or external_review.CASE_ID.fullmatch(case_id) is None
+            or case_id in predicted_by_id
+        ):
             raise ValueError("Holdout prediction case ids must be unique and non-empty.")
         predicted_by_id[case_id] = case
     if set(predicted_by_id) != set(labels_by_id):
@@ -424,6 +428,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     except (OSError, ValueError, UnicodeDecodeError, RecursionError) as exc:
         print("error: " + str(exc), file=sys.stderr)
         return 2
+    # The strict evaluator emits only metrics, fixed model identities, canonical
+    # public repository/commit identifiers, and restricted case/group IDs. Raw
+    # profiles, reviewer metadata, labels, process output, and credentials are
+    # absent from this allowlisted report shape.
+    # codeql[py/clear-text-logging-sensitive-data]
     print(json.dumps(result, indent=2, sort_keys=True, ensure_ascii=False))
     return 0
 

@@ -342,6 +342,9 @@ steps:
         reviewer_adjudicator = copy.deepcopy(payload)
         reviewer_adjudicator["cases"][0]["consensus"]["adjudicator_id"] = "reviewer-a"
         mutations.append(reviewer_adjudicator)
+        unsafe_identifier = copy.deepcopy(payload)
+        unsafe_identifier["cases"][0]["id"] = "case\nsecret"
+        mutations.append(unsafe_identifier)
         for mutation in mutations:
             with self.subTest(mutation=mutations.index(mutation)):
                 with self.assertRaises(ValueError):

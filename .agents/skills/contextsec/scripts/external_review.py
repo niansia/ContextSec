@@ -22,6 +22,8 @@ import safe_io  # noqa: E402
 
 LABEL_STATES = ("required", "candidate", "inactive", "unknown")
 SCHEMA_URL = "https://raw.githubusercontent.com/niansia/ContextSec/v0.4.0/benchmarks/external-review.schema.json"
+CASE_ID = re.compile(r"[a-z0-9][a-z0-9_-]{0,63}")
+FRAMEWORK_GROUP = re.compile(r"[a-z0-9][a-z0-9_.+-]{0,63}")
 
 
 def _load(path: Path) -> Dict[str, Any]:
@@ -167,7 +169,7 @@ def evaluate(payload: Mapping[str, Any]) -> Dict[str, Any]:
         }:
             raise ValueError("External review case has an invalid shape.")
         case_id = case.get("id")
-        if not isinstance(case_id, str) or not case_id:
+        if not isinstance(case_id, str) or CASE_ID.fullmatch(case_id) is None:
             raise ValueError("External review case id is invalid.")
         ids.append(case_id)
         if re.fullmatch(r"[a-f0-9]{40}", str(case.get("commit", ""))) is None:
@@ -264,7 +266,7 @@ def evaluate(payload: Mapping[str, Any]) -> Dict[str, Any]:
         if consensus["adjudicator_organization"] in reviewer_organizations:
             raise ValueError("The adjudicator must be organizationally independent.")
         framework = case.get("framework_group")
-        if not isinstance(framework, str) or not framework:
+        if not isinstance(framework, str) or FRAMEWORK_GROUP.fullmatch(framework) is None:
             raise ValueError("External cases require a framework_group.")
         case_disagreements = []
         for pack in profile_repo.PACK_ORDER:

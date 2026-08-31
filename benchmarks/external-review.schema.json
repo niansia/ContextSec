@@ -100,10 +100,10 @@
       "type": "object",
       "required": ["id", "repository", "commit", "framework_group", "license_spdx", "license_evidence_url", "selection_rank", "sampling_reason", "frozen_at", "annotator_a", "annotator_b", "consensus"],
       "properties": {
-        "id": {"type": "string", "minLength": 1},
+        "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$"},
         "repository": {"type": "string", "pattern": "^https://github\\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"},
         "commit": {"type": "string", "pattern": "^[a-f0-9]{40}$"},
-        "framework_group": {"type": "string", "minLength": 1},
+        "framework_group": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_.+-]{0,63}$"},
         "license_spdx": {"type": "string", "minLength": 1},
         "license_evidence_url": {"type": "string", "pattern": "^https://"},
         "selection_rank": {"type": "integer", "minimum": 1},
