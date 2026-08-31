@@ -529,7 +529,10 @@ class ProfilerTests(unittest.TestCase):
 
     def test_atomic_output_does_not_modify_hardlink_target(self):
         with tempfile.TemporaryDirectory() as temporary:
-            base = Path(temporary)
+            # macOS exposes its system temporary directory through /var, which is
+            # itself a symlink to /private/var. Canonicalize that trusted test
+            # fixture root so this test isolates hardlink replacement behavior.
+            base = Path(temporary).resolve(strict=True)
             original = base / "outside.txt"
             output = base / "profile.json"
             original.write_text("keep", encoding="utf-8")
@@ -540,6 +543,19 @@ class ProfilerTests(unittest.TestCase):
             PROFILER.write_output_atomic(output, "replacement")
             self.assertEqual("keep", original.read_text(encoding="utf-8"))
             self.assertEqual("replacement", output.read_text(encoding="utf-8"))
+
+    def test_atomic_output_refuses_symlink_parent(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            base = Path(temporary).resolve(strict=True)
+            real_directory = base / "real"
+            linked_directory = base / "linked"
+            real_directory.mkdir()
+            try:
+                os.symlink(real_directory, linked_directory, target_is_directory=True)
+            except OSError:
+                self.skipTest("Symlinks are unavailable in this environment")
+            with self.assertRaisesRegex(ValueError, "symlink or reparse point"):
+                PROFILER.write_output_atomic(linked_directory / "profile.json", "data")
 
     def test_deep_invalid_manifest_abstains_without_crashing(self):
         with tempfile.TemporaryDirectory() as temporary:
