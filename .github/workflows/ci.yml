@@ -19,7 +19,7 @@ jobs:
         python: ["3.11", "3.12", "3.13", "3.14"]
     steps:
       - name: Check out source
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: Set up Python
@@ -42,7 +42,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Check out source
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: Set up Python
@@ -74,11 +74,11 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Check out source
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: Check out Agent Skills reference at a fixed commit
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: agentskills/agentskills
           ref: 69ef37e9424c0a7ea9dd2293b559e43ec8176379
@@ -98,32 +98,32 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Check out ContextSec
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: Check out Merriv case
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: niansia/Merriv
           ref: 2fed8dc98273bb838920a0b5f06a79222f051e16
           path: real-repos/Merriv
           persist-credentials: false
       - name: Check out FastAPI template case
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: fastapi/full-stack-fastapi-template
           ref: 486f054cc8d1aead59ec96cc0a16933d06c10e0d
           path: real-repos/fastapi-template
           persist-credentials: false
       - name: Check out Stripe case
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: stripe-samples/accept-a-payment
           ref: 1a57c3b2f5aaf4ecd8de59ab0b1c3c5638827625
           path: real-repos/stripe-accept-payment
           persist-credentials: false
       - name: Check out OpenAI quickstart case
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: openai/openai-quickstart-node
           ref: 6e6e03496440913a82ccba6f17c2f41caa948c58
