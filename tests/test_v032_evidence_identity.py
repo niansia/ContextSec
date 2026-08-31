@@ -225,6 +225,8 @@ steps:
         self.assertIn("needs: proof", release)
         self.assertIn("git merge-base --is-ancestor", release)
         self.assertIn("gh attestation verify", release)
+        self.assertIn("for attempt in {1..30}", release)
+        self.assertIn("sleep 10", release)
         self.assertIn(
             "needs: [test, evidence, agent-skill-spec, real-repositories]", proof
         )
