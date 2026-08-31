@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.3 — Release attestation verifier compatibility
+
+- Checksum-pinned GitHub CLI 2.98.0 in the release job so immutable-release predicate v0.2 verification does not depend on the hosted runner's preinstalled CLI.
+- Added a bounded ten-minute availability window for GitHub's asynchronously published release attestation while retaining fail-closed behavior.
+- Kept artifact schemas at 0.3.2 because this patch changes release verification, not artifact semantics.
+
 ## 0.3.2 — Evidence identity hardening
 
 - Anchored POSIX repository traversal to directory descriptors, added Windows reparse/final-handle containment checks, and routed untrusted JSON artifacts through one bounded, duplicate-key-rejecting reader.

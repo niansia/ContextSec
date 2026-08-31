@@ -31,7 +31,7 @@ import versioning  # noqa: E402
 
 class V032HardeningTests(unittest.TestCase):
     def test_version_sources_drive_cli_schema_and_packager(self):
-        self.assertEqual("0.3.2", versioning.TOOL_VERSION)
+        self.assertEqual("0.3.3", versioning.TOOL_VERSION)
         self.assertEqual("0.3.2", versioning.SCHEMA_VERSION)
         self.assertEqual(versioning.TOOL_VERSION, profile_repo.DETECTOR_VERSION)
         self.assertEqual(versioning.TOOL_VERSION, check_controls.CHECKER_VERSION)
@@ -42,10 +42,10 @@ class V032HardeningTests(unittest.TestCase):
         self.assertEqual(versioning.TOOL_VERSION, doctor["tool_version"])
         self.assertTrue(doctor["python_supported"])
         self.assertEqual(
-            "contextsec-v0.3.2.zip", package_release.DEFAULT_OUTPUT.name
+            "contextsec-v0.3.3.zip", package_release.DEFAULT_OUTPUT.name
         )
-        self.assertIn('version: "0.3.2"', (ROOT / ".agents" / "skills" / "contextsec" / "SKILL.md").read_text(encoding="utf-8"))
-        self.assertIn("version: 0.3.2", (ROOT / "CITATION.cff").read_text(encoding="utf-8"))
+        self.assertIn('version: "0.3.3"', (ROOT / ".agents" / "skills" / "contextsec" / "SKILL.md").read_text(encoding="utf-8"))
+        self.assertIn("version: 0.3.3", (ROOT / "CITATION.cff").read_text(encoding="utf-8"))
         schema_text = "\n".join(
             path.read_text(encoding="utf-8")
             for path in (ROOT / ".agents" / "skills" / "contextsec" / "references").rglob("*.schema.json")

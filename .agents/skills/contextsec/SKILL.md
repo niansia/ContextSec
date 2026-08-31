@@ -4,7 +4,7 @@ description: Determine which security controls a product actually needs by profi
 license: Apache-2.0
 compatibility: Requires Python 3.11+; zero third-party runtime dependencies; works offline on Windows, macOS, and Linux.
 metadata:
-  version: "0.3.2"
+  version: "0.3.3"
   project: "ContextSec"
 ---
 
