@@ -433,6 +433,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     # profiles, reviewer metadata, labels, process output, and credentials are
     # absent from this allowlisted report shape. This is the command's structured
     # result channel, not diagnostic logging.
+
+    # codeql[py/clear-text-logging-sensitive-data]
     sys.stdout.write(json.dumps(result, indent=2, sort_keys=True, ensure_ascii=False))
     sys.stdout.write("\n")
     return 0
