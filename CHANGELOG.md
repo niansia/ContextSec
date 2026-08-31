@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased — Documentation and onboarding
+
+- Reworked the first screen around an editable ContextSec wordmark/decision visual, a copyable three-platform quick start, and concrete v0.4.1 maturity evidence.
+- Added focused onboarding in English, Traditional Chinese, Simplified Chinese, and Japanese, backed by a documentation contract that keeps language navigation, version references, local links, platform commands, and the first-run result synchronized.
+
 ## 0.4.1 — Promotion-readiness trust-boundary fixes
 
 - Fail closed when canonical Git origin, commit, or clean/dirty state changes between pre- and post-scan provenance snapshots, including aggregate component profiling.

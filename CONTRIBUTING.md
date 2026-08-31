@@ -28,7 +28,7 @@ ContextSec values small, reproducible evidence over large checklists.
 14. Update the exact verification-coverage registry when adding or removing a deterministic checker or repository-policy audit; never describe catalog count as automated coverage.
 15. External labels and predictions must use distinct, pinned signer workflows. Only a result whose trusted label timestamp predates its prediction timestamp may be presented as headline-eligible.
 
-Run before opening a pull request:
+Run before opening a pull request. Commands below use `python` on Windows; use `python3` on macOS or Linux:
 
 ```bash
 python -m unittest discover -s tests -v

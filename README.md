@@ -1,125 +1,123 @@
-# ContextSec
+<p align="center">
+  <img src="docs/assets/contextsec-hero.svg" width="100%" alt="ContextSec — know what security controls apply and prove what passed. Research preview v0.4.1." />
+</p>
 
-[![CI](https://github.com/niansia/ContextSec/actions/workflows/ci.yml/badge.svg)](https://github.com/niansia/ContextSec/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/niansia/ContextSec?display_name=tag&sort=semver)](https://github.com/niansia/ContextSec/releases)
-[![License](https://img.shields.io/github/license/niansia/ContextSec)](LICENSE)
-![Research Preview](https://img.shields.io/badge/status-research%20preview-6f42c1)
+<p align="center">
+  <a href="README.md"><strong>English</strong></a> ·
+  <a href="docs/i18n/README.zh-TW.md">繁體中文</a> ·
+  <a href="docs/i18n/README.zh-CN.md">简体中文</a> ·
+  <a href="docs/i18n/README.ja.md">日本語</a>
+</p>
 
-## The product-security decision layer for AI coding agents
+<p align="center">
+  <a href="https://github.com/niansia/ContextSec/actions/workflows/ci.yml"><img alt="CI status" src="https://github.com/niansia/ContextSec/actions/workflows/ci.yml/badge.svg" /></a>
+  <a href="https://github.com/niansia/ContextSec/releases/tag/v0.4.1"><img alt="Release v0.4.1" src="https://img.shields.io/badge/release-v0.4.1-d95d39" /></a>
+  <a href="LICENSE"><img alt="Apache-2.0 license" src="https://img.shields.io/github/license/niansia/ContextSec" /></a>
+  <img alt="Python 3.11 through 3.14" src="https://img.shields.io/badge/python-3.11–3.14-2563eb" />
+  <img alt="Research preview" src="https://img.shields.io/badge/status-research%20preview-7048b8" />
+</p>
 
-> **Your coding agent knows security rules. ContextSec tells it which ones your product actually needs.**
+## Security controls that match the product—not a generic checklist
 
-ContextSec turns bounded repository evidence into a reproducible answer to one question:
+**Your coding agent knows security rules. ContextSec tells it which ones this product actually needs, then keeps missing proof visible.**
 
-> **What security controls does this product need right now—and what evidence would prove them?**
+ContextSec reads bounded repository evidence, identifies product contexts such as payments, PII, tenancy, AI, uploads, CI/CD, cloud authority, and support access, then produces applicable controls and an evidence-backed release gate. It does not upload source, execute target code, or turn “no finding” into “verified.”
 
-It is not another OWASP checklist and not another general vulnerability scanner. It profiles what the product appears to do from bounded evidence, classifies product-risk packs and controls as required, candidate, inactive, or unknown, derives stricter controls where proven contexts intersect, and produces a Control Evaluation Ledger instead of treating silence as safety.
+| Decide | Compose | Prove |
+|---|---|---|
+| Route only the product-risk packs supported by evidence. | Derive stricter invariants when proven contexts intersect. | Record every applicable control as `verified`, `failed`, `unknown`, or `waived`. |
 
-```text
-Generic security skill
+ContextSec is an applicability and evidence layer—not a penetration test, general vulnerability scanner, or compliance certification.
 
-"Check this Next.js app."
-        ↓
-OWASP / generic checks
+## Try it in 60 seconds
 
+Requirements: Git and Python 3.11–3.14. The runtime has zero third-party dependencies. The included fixture is an intentionally incomplete Next.js invoice SaaS, so the expected gate result is `BLOCK`.
 
-ContextSec
+### Windows — PowerShell
 
-"What is this Next.js app actually doing?"
-        ↓
-B2B SaaS
-+ PII
-+ Stripe
-+ file upload
-+ OpenAI
-+ multi-tenant
-+ customer support admin
-        ↓
-classify control applicability
-+ derive cross-context invariants
-        ↓
-generate / review / test
-        ↓
-Control Ledger + evidence + release gate
+```powershell
+git clone https://github.com/niansia/ContextSec.git
+Set-Location ContextSec
+python --version  # must report Python 3.11–3.14
+python .agents/skills/contextsec/scripts/contextsec.py doctor
+python .agents/skills/contextsec/scripts/contextsec.py profile --repo examples/composite-saas --format markdown
+python .agents/skills/contextsec/scripts/contextsec.py check --repo examples/composite-saas
+python .agents/skills/contextsec/scripts/contextsec.py gate --repo examples/composite-saas
 ```
 
-**Status:** research preview `v0.4.1`. Local-first, read-only profiling, no source upload, no target-code execution, and no third-party runtime dependency.
-
-**Versioning:** Tool, detector, checker, and artifact-schema versions are independent and each has one canonical file. Their semantic model digests bind the behavior and dependencies that affect each artifact while ignoring comments and formatting.
-
-## The decision pipeline
-
-![ContextSec decision flow: product evidence becomes a bounded profile, applicable controls, and an evidence-backed release gate.](docs/assets/contextsec-decision-flow.svg)
-
-The diagram is a dependency-free, editable [SVG source](docs/assets/contextsec-decision-flow.svg); every label and shape remains reviewable in Git.
-
-The profiler preserves four distinctions generic security prompts usually blur:
-
-- **Applicability is not vulnerability detection.** A pack can apply even when no bug is found.
-- **No finding is not verification.** Unchecked controls remain `unknown` in the ledger.
-- **Inference confidence is not impact.** Weak evidence for a context and critical impact of a broken control are separate fields.
-- **Pack co-occurrence is not a data flow.** AI + PII or payment + tenancy starts as a candidate composition; direct intersection evidence makes the derived invariant required.
-
-## 90-second demo
-
-The included fixture is an intentionally incomplete Next.js invoice SaaS with Stripe, PII, tenancy, S3 uploads, and OpenAI. Clone the repository first; the commands below use `python` on Windows—use `python3` on macOS or Linux:
+### macOS — Terminal
 
 ```bash
 git clone https://github.com/niansia/ContextSec.git
 cd ContextSec
-
-python .agents/skills/contextsec/scripts/contextsec.py profile \
-  --repo examples/composite-saas \
-  --format markdown
-
-python .agents/skills/contextsec/scripts/contextsec.py check \
-  --repo examples/composite-saas
-
-python .agents/skills/contextsec/scripts/contextsec.py gate \
-  --repo examples/composite-saas
+python3 --version  # must report Python 3.11–3.14
+python3 .agents/skills/contextsec/scripts/contextsec.py doctor
+python3 .agents/skills/contextsec/scripts/contextsec.py profile --repo examples/composite-saas --format markdown
+python3 .agents/skills/contextsec/scripts/contextsec.py check --repo examples/composite-saas
+python3 .agents/skills/contextsec/scripts/contextsec.py gate --repo examples/composite-saas
 ```
 
-The current deterministic result is intentionally uncomfortable:
+### Linux — shell
+
+```bash
+git clone https://github.com/niansia/ContextSec.git
+cd ContextSec
+python3 --version  # must report Python 3.11–3.14
+python3 .agents/skills/contextsec/scripts/contextsec.py doctor
+python3 .agents/skills/contextsec/scripts/contextsec.py profile --repo examples/composite-saas --format markdown
+python3 .agents/skills/contextsec/scripts/contextsec.py check --repo examples/composite-saas
+python3 .agents/skills/contextsec/scripts/contextsec.py gate --repo examples/composite-saas
+```
+
+Expected summary:
 
 ```text
 required      foundation · baseline-web · auth-session · payments · privacy-pii
               multi-tenant · api-inbound · external-api · file-upload · ai-rag-agent
-
-required      AI+PII · AI+tenant · API+tenant intersections
-candidates    payment+tenant · upload+tenant intersections
-
+intersections AI+PII · AI+tenant · API+tenant required
 checks        5 failed · 1 unknown · 0 verified
-ledger        every applicable control represented; unchecked controls stay unknown
-gate          BLOCK
+gate          BLOCK — unchecked required controls remain visible
 ```
 
-The same framework does not select everything for every repository:
+The final command deliberately exits with status `1` because the fixture's release gate is blocked. The same engine routes only `foundation` and `baseline-web` for the included static Next.js example. It does not select every pack for every repository.
 
-| Scope | Required packs |
+Ready to try your own code? Keep this checkout open and replace `examples/composite-saas` with the absolute path to your repository; start with `profile`, review the evidence, then run `check` and `gate`.
+
+## What v0.4.1 means
+
+This is not a v0.1-shaped prototype with a newer badge. The current immutable release contains:
+
+| Area | Shipped and continuously checked |
 |---|---|
-| `examples/next-static` | `foundation`, `baseline-web` |
-| `tests/fixtures/secret-plane` | `foundation`, `secrets-management` |
-| `tests/fixtures/cicd-supply` | `foundation`, `cicd-supply-chain` |
-| `examples/composite-saas` | the ten directly applicable/dependency-routed original product packs |
+| Decision model | 16 product-risk packs, 116 catalog controls, and 9 cross-context composition controls |
+| Verification model | Exact 125-row coverage inventory; 21 rows have a deterministic checker or repository-policy audit |
+| Deterministic checks | 10 published checker families with positive, negative, mutation, and adversarial regressions |
+| Platform proof | Windows, macOS, and Ubuntu × Python 3.11–3.14 |
+| Repository evidence | 40 frozen profile cases plus 4 commit-pinned public-repository cases |
+| Release integrity | Exact-reviewed-main tags, byte-identical archives, three signed assets, draft re-download verification, and immutable Releases |
 
-Explain a decision without reading every pack:
+The research-preview label remains because independent ecosystem accuracy has not yet been established. That boundary is deliberate; it does not mean the release or its engineering controls are provisional.
+
+## Use it as an agent skill
+
+The canonical skill is [.agents/skills/contextsec](.agents/skills/contextsec). Agent Skills-compatible tools can load its `SKILL.md` directly. Keep it repository-local for the clearest provenance, or install the same folder at user scope.
+
+### Windows — optional user-level Codex installation
+
+```powershell
+$destination = Join-Path $env:USERPROFILE ".agents\skills\contextsec"
+New-Item -ItemType Directory -Force -Path $destination | Out-Null
+Copy-Item -Recurse -Force ".agents\skills\contextsec\*" $destination
+```
+
+### macOS and Linux — optional user-level Codex installation
 
 ```bash
-python .agents/skills/contextsec/scripts/contextsec.py explain payments
-python .agents/skills/contextsec/scripts/contextsec.py explain COMP-AI-TEN-001
-python .agents/skills/contextsec/scripts/contextsec.py explain payments --repo examples/composite-saas
+mkdir -p ~/.agents/skills/contextsec
+cp -R .agents/skills/contextsec/. ~/.agents/skills/contextsec/
 ```
 
-## Install as an agent skill
-
-The canonical skill is [.agents/skills/contextsec](.agents/skills/contextsec).
-
-- Agent Skills-compatible tools can load `SKILL.md` directly.
-- Keep it repository-local at `.agents/skills/contextsec`.
-- Copy the same folder to `.claude/skills/contextsec` for Claude Code.
-- Copy it to `$HOME/.agents/skills/contextsec` for a user-level Codex installation.
-
-Use natural requests:
+Claude Code users can copy the canonical folder to `.claude/skills/contextsec`. Then ask naturally:
 
 ```text
 Use $contextsec to derive security requirements for this PRD.
@@ -128,67 +126,20 @@ Use $contextsec to review this diff for newly activated product risks.
 Use $contextsec to evaluate release evidence and return the Control Ledger and gate.
 ```
 
-The skill is the orchestration layer; `catalog.json`, composition rules, schemas, profiler, checks, and tests remain shared artifacts rather than platform-specific prompt copies.
+## The decision pipeline
 
-### Cross-platform quick start
+![ContextSec decision flow: product evidence becomes a bounded profile, applicable controls, and an evidence-backed release gate.](docs/assets/contextsec-decision-flow.svg)
 
-ContextSec has a zero-dependency Python runtime. CI runs the full test suite and public benchmark CLI on Windows, macOS, and Ubuntu with Python 3.11–3.14.
+The profiler keeps four distinctions generic security prompts often blur:
 
-```bash
-python .agents/skills/contextsec/scripts/contextsec.py --version
-python .agents/skills/contextsec/scripts/contextsec.py doctor
-```
+- **Applicability is not vulnerability detection.** A pack can apply even when no bug is found.
+- **No finding is not verification.** Unchecked controls remain `unknown` in the ledger.
+- **Inference confidence is not impact.** Weak evidence for a context and critical impact of a broken control are separate fields.
+- **Pack co-occurrence is not a data flow.** Direct intersection evidence is required before a composition becomes required.
 
-#### Windows — PowerShell
+Both diagrams are dependency-free, editable SVG sources whose labels and shapes remain reviewable in Git.
 
-```powershell
-git clone https://github.com/niansia/ContextSec.git
-Set-Location ContextSec
-python -m unittest discover -s tests
-python .agents\skills\contextsec\scripts\contextsec.py benchmark --suite all
-```
-
-Optional user-level Codex installation, using the [official Codex user-skill location](https://developers.openai.com/codex/skills#where-codex-loads-local-skills):
-
-```powershell
-$destination = Join-Path $env:USERPROFILE ".agents\skills\contextsec"
-New-Item -ItemType Directory -Force -Path $destination | Out-Null
-Copy-Item -Recurse -Force ".agents\skills\contextsec\*" $destination
-```
-
-#### macOS — Terminal
-
-```bash
-git clone https://github.com/niansia/ContextSec.git
-cd ContextSec
-python3 -m unittest discover -s tests
-python3 .agents/skills/contextsec/scripts/contextsec.py benchmark --suite all
-```
-
-Optional user-level Codex installation:
-
-```bash
-mkdir -p ~/.agents/skills/contextsec
-cp -R .agents/skills/contextsec/. ~/.agents/skills/contextsec/
-```
-
-#### Linux — shell
-
-```bash
-git clone https://github.com/niansia/ContextSec.git
-cd ContextSec
-python3 -m unittest discover -s tests
-python3 .agents/skills/contextsec/scripts/contextsec.py benchmark --suite all
-```
-
-Optional user-level Codex installation:
-
-```bash
-mkdir -p ~/.agents/skills/contextsec
-cp -R .agents/skills/contextsec/. ~/.agents/skills/contextsec/
-```
-
-For repository-local use in another project, copy the canonical folder to that repository's `.agents/skills/contextsec`; Claude Code users can use `.claude/skills/contextsec` instead. Keep one canonical copy rather than maintaining platform-specific prompt forks.
+Command notation below uses `python` for brevity. Use `python3` on macOS or Linux, as shown in the copyable quick starts above.
 
 ## What is machine-verifiable now
 
@@ -202,7 +153,7 @@ The profiler emits versioned observations, claims, routing, contradictions, and 
 - `content_digest`: whole-file integrity digest;
 - `fingerprint`: evidence identity bound to the content digest;
 - `subject_revision`: the bounded repository scope plus active routing model evaluated by this run;
-- `source_inventory_digest`: the exact supported production file inventory shared by profiler and checker, used to reject mid-evaluation source changes.
+- `source_inventory_digest`: the exact supported production file inventory shared by profiler and checker, used to reject mid-evaluation source changes;
 - `source_provenance`: a canonical Git origin, full commit, and clean/dirty worktree state; identical pre- and post-scan snapshots are required before all-three verified can bind a Profile to a frozen external case.
 
 These hashes are integrity identifiers, not secrecy mechanisms. ContextSec never emits matched source lines or source-content values. Repository-relative filenames use bounded heuristic redaction by default and may themselves contain personal data; use `--path-privacy hashed` or `--path-privacy opaque` when filenames are sensitive. Those modes are deterministic pseudonymization, not secrecy: low-entropy filenames can still be guessed by hashing candidate paths. The selected policy is explicit in `artifact_options.path_privacy` and never changes canonical path identity.
@@ -230,13 +181,8 @@ The [machine-readable support matrix](.agents/skills/contextsec/references/suppo
 A monorepo is not treated as one blended application. `profile-components` consumes an explicit component model, rejects duplicate or overlapping roots, unknown dependencies, dependency cycles, and flows with unknown endpoints, then emits one independently source-bound Profile per component plus declared cross-component flows. The aggregate artifact binds canonical component roots through full path identities and each component Profile digest, while every displayed root obeys `artifact_options.path_privacy`.
 
 ```bash
-python .agents/skills/contextsec/scripts/contextsec.py profile-components \
-  --repo . \
-  --components component-model.json \
-  --output component-profile.json
-
-python .agents/skills/contextsec/scripts/contextsec.py validate-component-profile \
-  component-profile.json
+python .agents/skills/contextsec/scripts/contextsec.py profile-components --repo . --components component-model.json --output component-profile.json
+python .agents/skills/contextsec/scripts/contextsec.py validate-component-profile component-profile.json
 ```
 
 Cross-component flow declarations require named capabilities and evidence references; they do not silently convert component co-location into a proven data flow.
@@ -293,7 +239,7 @@ Run every offline benchmark suite:
 python .agents/skills/contextsec/scripts/contextsec.py benchmark --suite all
 ```
 
-v0.4 keeps evidence classes separate:
+v0.4.1 keeps evidence classes separate:
 
 | Suite | Scope | Current result | What it does **not** prove |
 |---|---:|---:|---|
@@ -361,7 +307,7 @@ python .agents/skills/contextsec/scripts/contextsec.py explain secrets-managemen
 2. **v0.4 — trust-closure contracts:** independent tool/detector/checker versions, semantic model digests, clean commit-bound Profiles, explicit monorepo components, strict external-review independence, attestation-gated holdouts, exact verification coverage, and exact-main immutable release evidence.
 3. **Next — collect external ground truth:** qualified third parties must populate the already-frozen protocol; comparative agent studies and broader checker/framework coverage remain future evidence, not current claims.
 
-Read [architecture](docs/architecture.md), [competitive positioning](docs/competitive-positioning.md), [v0.2.1 review resolution](docs/review-resolution-v0.2.1.md), and [release roadmap](docs/roadmap.md) before proposing a large feature.
+Start with the [documentation map](docs/README.md), then read [architecture](docs/architecture.md), [competitive positioning](docs/competitive-positioning.md), and the [release roadmap](docs/roadmap.md) before proposing a large feature. Historical review resolutions remain available for auditability.
 
 ## Contributing and security
 

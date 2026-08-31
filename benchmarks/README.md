@@ -1,5 +1,7 @@
 # ContextSec benchmarks
 
+Commands in this document use `python` on Windows. Use `python3` on macOS or Linux; the benchmark CLI is exercised on all three operating systems in CI.
+
 ContextSec keeps five evidence classes separate so a regression pass cannot be presented as general accuracy.
 
 | Manifest | Purpose | Network or target execution |
@@ -28,9 +30,7 @@ python .agents/skills/contextsec/scripts/contextsec.py benchmark --suite adversa
 The real-repository suite accepts a directory whose immediate children match each manifest `directory`. It verifies each checkout's `HEAD` before profiling:
 
 ```bash
-python .agents/skills/contextsec/scripts/contextsec.py benchmark \
-  --suite real-repo \
-  --workspace /path/to/pinned-checkouts
+python .agents/skills/contextsec/scripts/contextsec.py benchmark --suite real-repo --workspace /path/to/pinned-checkouts
 ```
 
 The runner does not clone repositories. Fetching the public sources is an explicit preparation step outside ContextSec's no-network profiler boundary.

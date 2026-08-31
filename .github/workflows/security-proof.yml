@@ -34,7 +34,7 @@ jobs:
         run: python .agents\skills\contextsec\scripts\contextsec.py benchmark --suite all
       - name: Smoke-test public CLI (macOS and Linux)
         if: runner.os != 'Windows'
-        run: python .agents/skills/contextsec/scripts/contextsec.py benchmark --suite all
+        run: python3 .agents/skills/contextsec/scripts/contextsec.py benchmark --suite all
 
   evidence:
     runs-on: ubuntu-latest
