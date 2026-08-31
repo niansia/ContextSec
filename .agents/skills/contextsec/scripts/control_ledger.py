@@ -146,6 +146,7 @@ def validate_subject_binding(
     profile_subject = profile.get("subject", {})
     check_subject = checks.get("subject", {})
     live_profile_models = {
+        "detector_version": profile_repo.DETECTOR_VERSION,
         "decision_model_digest": profile_repo.DECISION_MODEL_DIGEST,
         "routing_model_digest": profile_repo.ROUTING_MODEL_DIGEST,
         "detector_model_digest": profile_repo.DETECTOR_MODEL_DIGEST,
@@ -175,6 +176,7 @@ def validate_subject_binding(
         *tuple(
             (field, profile_subject.get(field), check_subject.get(field))
             for field in (
+                "detector_version",
                 "routing_model_digest",
                 "detector_model_digest",
                 "catalog_digest",
@@ -446,11 +448,13 @@ def build_ledger(
             "subject_revision": profile["subject"]["subject_revision"],
             "decision_model_digest": profile["subject"]["decision_model_digest"],
             "routing_model_digest": profile["subject"]["routing_model_digest"],
+            "detector_version": profile["subject"]["detector_version"],
             "detector_model_digest": profile["subject"]["detector_model_digest"],
             "catalog_digest": profile["subject"]["catalog_digest"],
             "composition_digest": profile["subject"]["composition_digest"],
             "support_matrix_digest": profile["subject"]["support_matrix_digest"],
             "checker_model_digest": checks["subject"]["checker_model_digest"],
+            "checker_version": checks["subject"]["checker_version"],
             "source_inventory_digest": profile["subject"]["source_inventory_digest"],
             "profile_coverage": profile["coverage"]["status"],
             "profile_language_support": profile["coverage"]["language_support"],

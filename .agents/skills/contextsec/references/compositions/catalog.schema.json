@@ -1,11 +1,11 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/niansia/ContextSec/v0.3.2/.agents/skills/contextsec/references/compositions/catalog.schema.json",
+  "$id": "https://raw.githubusercontent.com/niansia/ContextSec/v0.4.0/.agents/skills/contextsec/references/compositions/catalog.schema.json",
   "title": "ContextSec composition catalog",
   "type": "object",
   "required": ["schema_version", "rules"],
   "properties": {
-    "schema_version": {"const": "0.3.2"},
+    "schema_version": {"const": "0.4.0"},
     "rules": {
       "type": "array",
       "items": {

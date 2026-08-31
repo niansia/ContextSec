@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.4.0 — Trust closure and component evidence
+
+- Split tool, detector, checker, and artifact-schema versions into independent canonical sources and replaced source-text digests with dependency-aware semantic model digests that ignore formatting and comments.
+- Bound every Profile to canonical Git origin, full commit, and clean/dirty worktree provenance; frozen holdout cases now reject unavailable, dirty, repository-mismatched, or commit-mismatched Profiles.
+- Added an explicit monorepo component model with non-overlapping roots, acyclic dependencies, independently profiled components, declared cross-component flows, and tamper-detecting aggregate validation.
+- Removed reviewer-supplied `support_class`; the holdout evaluator derives it from each Profile and excludes all ContextSec contributors, same-organization reviewer pairs, undisclosed conflicts, post-output labels, and non-independent adjudication.
+- Made holdout results headline-eligible only after online verification of attestations for both frozen labels and predictions; explicitly permitted unsigned runs are marked development-only.
+- Published an exact 125-row verification-coverage artifact that distinguishes automated checker/policy coverage from evidence-required controls without treating either as a pass.
+- Audited digest-pinned `docker://` actions, job containers, services, and exact effective job-level GitHub token permissions in addition to pinned Actions.
+- Made Immutable Releases a pre-build API precondition, required the release environment, increased the job timeout to 30 minutes, required the tag commit to equal current `main`, and added attested `release-evidence.json` binding source, models, proof, coverage, and archive digest.
+
 ## 0.3.3 — Release attestation verifier compatibility
 
 - Checksum-pinned GitHub CLI 2.98.0 in the release job so immutable-release predicate v0.2 verification does not depend on the hosted runner's preinstalled CLI.

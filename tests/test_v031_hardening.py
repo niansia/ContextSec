@@ -31,10 +31,12 @@ import versioning  # noqa: E402
 
 class V032HardeningTests(unittest.TestCase):
     def test_version_sources_drive_cli_schema_and_packager(self):
-        self.assertEqual("0.3.3", versioning.TOOL_VERSION)
-        self.assertEqual("0.3.2", versioning.SCHEMA_VERSION)
-        self.assertEqual(versioning.TOOL_VERSION, profile_repo.DETECTOR_VERSION)
-        self.assertEqual(versioning.TOOL_VERSION, check_controls.CHECKER_VERSION)
+        self.assertEqual("0.4.0", versioning.TOOL_VERSION)
+        self.assertEqual("0.4.0", versioning.SCHEMA_VERSION)
+        self.assertEqual("0.4.0", profile_repo.DETECTOR_VERSION)
+        self.assertEqual("0.4.0", check_controls.CHECKER_VERSION)
+        self.assertNotEqual(versioning.TOOL_VERSION_PATH, versioning.DETECTOR_VERSION_PATH)
+        self.assertNotEqual(versioning.TOOL_VERSION_PATH, versioning.CHECKER_VERSION_PATH)
         output = io.StringIO()
         with contextlib.redirect_stdout(output):
             self.assertEqual(0, contextsec.doctor())
@@ -42,16 +44,16 @@ class V032HardeningTests(unittest.TestCase):
         self.assertEqual(versioning.TOOL_VERSION, doctor["tool_version"])
         self.assertTrue(doctor["python_supported"])
         self.assertEqual(
-            "contextsec-v0.3.3.zip", package_release.DEFAULT_OUTPUT.name
+            "contextsec-v0.4.0.zip", package_release.DEFAULT_OUTPUT.name
         )
-        self.assertIn('version: "0.3.3"', (ROOT / ".agents" / "skills" / "contextsec" / "SKILL.md").read_text(encoding="utf-8"))
-        self.assertIn("version: 0.3.3", (ROOT / "CITATION.cff").read_text(encoding="utf-8"))
+        self.assertIn('version: "0.4.0"', (ROOT / ".agents" / "skills" / "contextsec" / "SKILL.md").read_text(encoding="utf-8"))
+        self.assertIn("version: 0.4.0", (ROOT / "CITATION.cff").read_text(encoding="utf-8"))
         schema_text = "\n".join(
             path.read_text(encoding="utf-8")
             for path in (ROOT / ".agents" / "skills" / "contextsec" / "references").rglob("*.schema.json")
         )
         self.assertNotIn("contextsec.dev", schema_text)
-        self.assertIn("/v0.3.2/", schema_text)
+        self.assertIn("/v0.4.0/", schema_text)
 
     def test_external_review_is_available_through_public_dispatcher(self):
         output = io.StringIO()
@@ -199,7 +201,7 @@ jobs:
         disagreeing = dict(labels)
         disagreeing["payments"] = "required"
         payload = {
-            "$schema": "https://raw.githubusercontent.com/niansia/ContextSec/v0.3.2/benchmarks/external-review.schema.json",
+            "$schema": "https://raw.githubusercontent.com/niansia/ContextSec/v0.4.0/benchmarks/external-review.schema.json",
             "version": "test",
             "status": "complete",
             "sampling_frame": {
@@ -211,40 +213,42 @@ jobs:
             },
             "review_policy": {
                 "detector_implementers_excluded": True,
+                "contextsec_contributors_excluded": True,
                 "reviewers_label_before_tool_output": True,
+                "reviewers_from_distinct_organizations": True,
+                "adjudicator_independent_of_reviewers": True,
+                "conflicts_disclosed": True,
                 "disagreements_retained": True,
                 "minimum_reviewers_per_case": 2,
             },
             "cases": [
                 {
                     "id": "case-one",
-                    "repository": "https://example.invalid/one",
+                    "repository": "https://github.com/example/one",
                     "commit": "1" * 40,
                     "framework_group": "python",
-                    "support_class": "supported",
                     "license_spdx": "MIT",
                     "license_evidence_url": "https://example.invalid/one/LICENSE",
                     "selection_rank": 1,
                     "sampling_reason": "First eligible case.",
                     "frozen_at": "2026-08-31",
-                    "annotator_a": {"reviewer_id": "a", "implemented_detectors": False, "expertise_class": "application-security", "labels": labels},
-                    "annotator_b": {"reviewer_id": "b", "implemented_detectors": False, "expertise_class": "product-security", "labels": labels},
-                    "consensus": {"labels": labels, "adjudication_reason": "Reviewers agreed.", "adjudicator_id": "c", "adjudicator_implemented_detectors": False},
+                    "annotator_a": {"reviewer_id": "a", "implemented_detectors": False, "contextsec_contributor": False, "organization": "lab-a", "conflicts_of_interest": [], "expertise_class": "application-security", "labels_frozen_at": "2026-08-31", "labels": labels},
+                    "annotator_b": {"reviewer_id": "b", "implemented_detectors": False, "contextsec_contributor": False, "organization": "lab-b", "conflicts_of_interest": [], "expertise_class": "product-security", "labels_frozen_at": "2026-08-31", "labels": labels},
+                    "consensus": {"labels": labels, "adjudication_reason": "Reviewers agreed.", "adjudicator_id": "c", "adjudicator_implemented_detectors": False, "adjudicator_contextsec_contributor": False, "adjudicator_organization": "lab-c", "adjudicator_conflicts_of_interest": []},
                 },
                 {
                     "id": "case-two",
-                    "repository": "https://example.invalid/two",
+                    "repository": "https://github.com/example/two",
                     "commit": "2" * 40,
                     "framework_group": "node",
-                    "support_class": "supported",
                     "license_spdx": "Apache-2.0",
                     "license_evidence_url": "https://example.invalid/two/LICENSE",
                     "selection_rank": 2,
                     "sampling_reason": "Second eligible case.",
                     "frozen_at": "2026-08-31",
-                    "annotator_a": {"reviewer_id": "a", "implemented_detectors": False, "expertise_class": "application-security", "labels": labels},
-                    "annotator_b": {"reviewer_id": "b", "implemented_detectors": False, "expertise_class": "product-security", "labels": disagreeing},
-                    "consensus": {"labels": disagreeing, "adjudication_reason": "Payment evidence was accepted after review.", "adjudicator_id": "c", "adjudicator_implemented_detectors": False},
+                    "annotator_a": {"reviewer_id": "a", "implemented_detectors": False, "contextsec_contributor": False, "organization": "lab-a", "conflicts_of_interest": [], "expertise_class": "application-security", "labels_frozen_at": "2026-08-31", "labels": labels},
+                    "annotator_b": {"reviewer_id": "b", "implemented_detectors": False, "contextsec_contributor": False, "organization": "lab-b", "conflicts_of_interest": [], "expertise_class": "product-security", "labels_frozen_at": "2026-08-31", "labels": disagreeing},
+                    "consensus": {"labels": disagreeing, "adjudication_reason": "Payment evidence was accepted after review.", "adjudicator_id": "c", "adjudicator_implemented_detectors": False, "adjudicator_contextsec_contributor": False, "adjudicator_organization": "lab-c", "adjudicator_conflicts_of_interest": []},
                 },
             ],
         }

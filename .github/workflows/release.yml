@@ -19,7 +19,8 @@ jobs:
     name: build, verify, and publish
     needs: proof
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
+    environment: release
     permissions:
       contents: write
       id-token: write
@@ -49,7 +50,19 @@ jobs:
       - name: Verify pinned GitHub CLI version
         shell: bash
         run: gh version | grep -q '^gh version 2\.98\.0 '
-      - name: Verify tag identity and main ancestry
+      - name: Verify immutable releases before building
+        shell: bash
+        env:
+          ADMIN_TOKEN: ${{ secrets.RELEASE_ADMIN_TOKEN }}
+        run: |
+          test -n "$ADMIN_TOKEN"
+          immutable="$(GH_TOKEN="$ADMIN_TOKEN" gh api \
+            -H 'Accept: application/vnd.github+json' \
+            -H 'X-GitHub-Api-Version: 2026-03-10' \
+            "repos/$GITHUB_REPOSITORY/immutable-releases" \
+            --jq '.enabled')"
+          test "$immutable" = "true"
+      - name: Verify tag is the exact reviewed main head
         shell: bash
         run: |
           version="$(tr -d '\r\n' < .agents/skills/contextsec/VERSION)"
@@ -57,8 +70,8 @@ jobs:
           [[ "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
           git fetch --no-tags origin "+refs/heads/main:refs/remotes/origin/main"
           tag_commit="$(git rev-parse "$GITHUB_REF_NAME^{commit}")"
-          git merge-base --is-ancestor "$tag_commit" refs/remotes/origin/main
-      - name: Build byte-identical release archives and checksums
+          test "$tag_commit" = "$(git rev-parse refs/remotes/origin/main)"
+      - name: Build byte-identical release archives
         shell: bash
         run: |
           version="$(tr -d '\r\n' < .agents/skills/contextsec/VERSION)"
@@ -68,14 +81,32 @@ jobs:
           cmp "dist/contextsec-v$version-first.zip" "dist/contextsec-v$version-second.zip"
           mv "dist/contextsec-v$version-first.zip" "dist/contextsec-v$version.zip"
           rm "dist/contextsec-v$version-second.zip"
+      - name: Create exact-main release evidence and checksums
+        shell: bash
+        env:
+          PROOF_RESULT: ${{ needs.proof.result }}
+        run: |
+          version="$(tr -d '\r\n' < .agents/skills/contextsec/VERSION)"
+          tag_commit="$(git rev-parse "$GITHUB_REF_NAME^{commit}")"
+          main_commit="$(git rev-parse refs/remotes/origin/main)"
+          python .agents/skills/contextsec/scripts/release_evidence.py \
+            --archive "dist/contextsec-v$version.zip" \
+            --tag "$GITHUB_REF_NAME" \
+            --source-commit "$tag_commit" \
+            --main-commit "$main_commit" \
+            --workflow-run "https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/attempts/$GITHUB_RUN_ATTEMPT" \
+            --proof-result "$PROOF_RESULT" \
+            --immutable-releases-enabled true \
+            --output dist/release-evidence.json
           cd dist
-          sha256sum "contextsec-v$version.zip" > SHA256SUMS
+          sha256sum "contextsec-v$version.zip" release-evidence.json > SHA256SUMS
           sha256sum --check SHA256SUMS
       - name: Attest release archive and checksum manifest
         uses: actions/attest-build-provenance@43d14bc2b83dec42d39ecae14e916627a18bb661 # v3
         with:
           subject-path: |
             dist/contextsec-v*.zip
+            dist/release-evidence.json
             dist/SHA256SUMS
       - name: Verify local artifact attestations
         shell: bash
@@ -83,8 +114,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           version="$(tr -d '\r\n' < .agents/skills/contextsec/VERSION)"
-          gh attestation verify "dist/contextsec-v$version.zip" --repo "$GITHUB_REPOSITORY"
-          gh attestation verify dist/SHA256SUMS --repo "$GITHUB_REPOSITORY"
+          tag_commit="$(git rev-parse "$GITHUB_REF_NAME^{commit}")"
+          signer_workflow="github.com/$GITHUB_REPOSITORY/.github/workflows/release.yml"
+          gh attestation verify "dist/contextsec-v$version.zip" --repo "$GITHUB_REPOSITORY" --signer-workflow "$signer_workflow" --source-digest "$tag_commit" --deny-self-hosted-runners
+          gh attestation verify dist/release-evidence.json --repo "$GITHUB_REPOSITORY" --signer-workflow "$signer_workflow" --source-digest "$tag_commit" --deny-self-hosted-runners
+          gh attestation verify dist/SHA256SUMS --repo "$GITHUB_REPOSITORY" --signer-workflow "$signer_workflow" --source-digest "$tag_commit" --deny-self-hosted-runners
       - name: Create immutable release candidate draft
         shell: bash
         env:
@@ -94,6 +128,7 @@ jobs:
           release_notes="$(<.github/release-notes-preamble.md)"
           gh release create "$GITHUB_REF_NAME" \
             "dist/contextsec-v$version.zip" \
+            "dist/release-evidence.json" \
             "dist/SHA256SUMS" \
             --verify-tag \
             --draft \
@@ -111,8 +146,12 @@ jobs:
           cd "$verification_dir"
           sha256sum --check SHA256SUMS
           cmp "contextsec-v$version.zip" "$GITHUB_WORKSPACE/dist/contextsec-v$version.zip"
-          gh attestation verify "contextsec-v$version.zip" --repo "$GITHUB_REPOSITORY"
-          gh attestation verify SHA256SUMS --repo "$GITHUB_REPOSITORY"
+          cmp release-evidence.json "$GITHUB_WORKSPACE/dist/release-evidence.json"
+          tag_commit="$(git -C "$GITHUB_WORKSPACE" rev-parse "$GITHUB_REF_NAME^{commit}")"
+          signer_workflow="github.com/$GITHUB_REPOSITORY/.github/workflows/release.yml"
+          gh attestation verify "contextsec-v$version.zip" --repo "$GITHUB_REPOSITORY" --signer-workflow "$signer_workflow" --source-digest "$tag_commit" --deny-self-hosted-runners
+          gh attestation verify release-evidence.json --repo "$GITHUB_REPOSITORY" --signer-workflow "$signer_workflow" --source-digest "$tag_commit" --deny-self-hosted-runners
+          gh attestation verify SHA256SUMS --repo "$GITHUB_REPOSITORY" --signer-workflow "$signer_workflow" --source-digest "$tag_commit" --deny-self-hosted-runners
       - name: Publish only after draft asset verification succeeds
         shell: bash
         env:

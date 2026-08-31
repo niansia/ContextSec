@@ -5,6 +5,7 @@ import copy
 import io
 import json
 import re
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -33,9 +34,13 @@ def _labels_from_profile(profile):
     return {item["pack"]: item["state"] for item in profile["routing"]}
 
 
-def _external_payload(labels):
+def _external_payload(
+    labels,
+    repository="https://github.com/example/repository",
+    commit="a" * 40,
+):
     return {
-        "$schema": "https://raw.githubusercontent.com/niansia/ContextSec/v0.3.2/benchmarks/external-review.schema.json",
+        "$schema": "https://raw.githubusercontent.com/niansia/ContextSec/v0.4.0/benchmarks/external-review.schema.json",
         "version": "test-protocol",
         "status": "complete",
         "sampling_frame": {
@@ -47,17 +52,20 @@ def _external_payload(labels):
         },
         "review_policy": {
             "detector_implementers_excluded": True,
+            "contextsec_contributors_excluded": True,
             "reviewers_label_before_tool_output": True,
+            "reviewers_from_distinct_organizations": True,
+            "adjudicator_independent_of_reviewers": True,
+            "conflicts_disclosed": True,
             "disagreements_retained": True,
             "minimum_reviewers_per_case": 2,
         },
         "cases": [
             {
                 "id": "case-one",
-                "repository": "https://example.invalid/repository",
-                "commit": "a" * 40,
+                "repository": repository,
+                "commit": commit,
                 "framework_group": "nextjs",
-                "support_class": "supported",
                 "license_spdx": "Apache-2.0",
                 "license_evidence_url": "https://example.invalid/repository/LICENSE",
                 "selection_rank": 1,
@@ -66,13 +74,21 @@ def _external_payload(labels):
                 "annotator_a": {
                     "reviewer_id": "reviewer-a",
                     "implemented_detectors": False,
+                    "contextsec_contributor": False,
+                    "organization": "review-lab-a",
+                    "conflicts_of_interest": [],
                     "expertise_class": "application-security",
+                    "labels_frozen_at": "2026-08-31",
                     "labels": dict(labels),
                 },
                 "annotator_b": {
                     "reviewer_id": "reviewer-b",
                     "implemented_detectors": False,
+                    "contextsec_contributor": False,
+                    "organization": "review-lab-b",
+                    "conflicts_of_interest": [],
                     "expertise_class": "product-security",
+                    "labels_frozen_at": "2026-08-31",
                     "labels": dict(labels),
                 },
                 "consensus": {
@@ -80,6 +96,9 @@ def _external_payload(labels):
                     "adjudication_reason": "Reviewers agreed after independent labeling.",
                     "adjudicator_id": "reviewer-c",
                     "adjudicator_implemented_detectors": False,
+                    "adjudicator_contextsec_contributor": False,
+                    "adjudicator_organization": "review-lab-c",
+                    "adjudicator_conflicts_of_interest": [],
                 },
             }
         ],
@@ -87,14 +106,17 @@ def _external_payload(labels):
 
 
 def _prediction_payload(profile):
+    provenance = profile["subject"]["source_provenance"]
     return {
-        "$schema": "https://raw.githubusercontent.com/niansia/ContextSec/v0.3.2/benchmarks/holdout-predictions.schema.json",
+        "$schema": "https://raw.githubusercontent.com/niansia/ContextSec/v0.4.0/benchmarks/holdout-predictions.schema.json",
         "version": "test-predictions",
         "status": "complete",
         "tool": {
             "tool_version": versioning.TOOL_VERSION,
             "schema_version": versioning.SCHEMA_VERSION,
             "git_commit": "b" * 40,
+            "detector_version": versioning.DETECTOR_VERSION,
+            "checker_version": versioning.CHECKER_VERSION,
             "detector_model_digest": profile_repo.DETECTOR_MODEL_DIGEST,
             "routing_model_digest": profile_repo.ROUTING_MODEL_DIGEST,
             "checker_model_digest": check_controls.CHECKER_MODEL_DIGEST,
@@ -105,8 +127,8 @@ def _prediction_payload(profile):
         "cases": [
             {
                 "id": "case-one",
-                "repository": "https://example.invalid/repository",
-                "commit": "a" * 40,
+                "repository": provenance["repository"],
+                "commit": provenance["commit"],
                 "profile": profile,
             }
         ],
@@ -223,7 +245,14 @@ steps:
         self.assertIn("uses: ./.github/workflows/security-proof.yml", ci)
         self.assertIn("uses: ./.github/workflows/security-proof.yml", release)
         self.assertIn("needs: proof", release)
-        self.assertIn("git merge-base --is-ancestor", release)
+        self.assertIn(
+            'test "$tag_commit" = "$(git rev-parse refs/remotes/origin/main)"',
+            release,
+        )
+        self.assertIn("timeout-minutes: 30", release)
+        self.assertIn("environment: release", release)
+        self.assertIn("repos/$GITHUB_REPOSITORY/immutable-releases", release)
+        self.assertIn("release-evidence.json", release)
         self.assertIn("gh attestation verify", release)
         self.assertIn("gh_2.98.0_linux_amd64.tar.gz", release)
         self.assertIn(
@@ -239,6 +268,7 @@ steps:
     def test_exact_action_allowlist_and_support_schema_are_public_contracts(self):
         policy = json.loads((ROOT / "ci" / "allowed-actions.json").read_text(encoding="utf-8"))
         self.assertNotIn("allowed_owners", policy)
+        self.assertEqual([], policy["allowed_docker_images"])
         self.assertEqual(
             {
                 "actions/checkout",
@@ -257,8 +287,8 @@ steps:
                 / "support-matrix.schema.json"
             ).read_text(encoding="utf-8")
         )
-        self.assertEqual("0.3.2", schema["properties"]["schema_version"]["const"])
-        self.assertEqual("0.3.2", support_matrix.SUPPORT_MATRIX["schema_version"])
+        self.assertEqual("0.4.0", schema["properties"]["schema_version"]["const"])
+        self.assertEqual("0.4.0", support_matrix.SUPPORT_MATRIX["schema_version"])
 
     def test_all_benchmark_includes_adversarial(self):
         passed = {"status": "pass"}
@@ -303,6 +333,15 @@ steps:
         adjudicator = copy.deepcopy(payload)
         adjudicator["cases"][0]["consensus"]["adjudicator_implemented_detectors"] = True
         mutations.append(adjudicator)
+        contributor = copy.deepcopy(payload)
+        contributor["cases"][0]["annotator_a"]["contextsec_contributor"] = True
+        mutations.append(contributor)
+        same_organization = copy.deepcopy(payload)
+        same_organization["cases"][0]["annotator_b"]["organization"] = "review-lab-a"
+        mutations.append(same_organization)
+        reviewer_adjudicator = copy.deepcopy(payload)
+        reviewer_adjudicator["cases"][0]["consensus"]["adjudicator_id"] = "reviewer-a"
+        mutations.append(reviewer_adjudicator)
         for mutation in mutations:
             with self.subTest(mutation=mutations.index(mutation)):
                 with self.assertRaises(ValueError):
@@ -331,12 +370,42 @@ steps:
         ):
             self.assertRegex(doctor[field], r"^sha256:[a-f0-9]{64}$")
 
-        profile = profile_repo.profile_repository(ROOT / "examples" / "next-static")
-        labels = _external_payload(_labels_from_profile(profile))
+        with tempfile.TemporaryDirectory() as temporary:
+            repository = Path(temporary) / "repository"
+            repository.mkdir()
+            (repository / "package.json").write_text(
+                '{"dependencies":{"next":"1.0.0"}}', encoding="utf-8"
+            )
+            subprocess.run(["git", "init", "-q", str(repository)], check=True)
+            subprocess.run(
+                ["git", "-C", str(repository), "config", "user.email", "test@example.com"],
+                check=True,
+            )
+            subprocess.run(
+                ["git", "-C", str(repository), "config", "user.name", "Test"],
+                check=True,
+            )
+            subprocess.run(
+                ["git", "-C", str(repository), "remote", "add", "origin", "https://github.com/example/repository.git"],
+                check=True,
+            )
+            subprocess.run(["git", "-C", str(repository), "add", "package.json"], check=True)
+            subprocess.run(
+                ["git", "-C", str(repository), "commit", "-q", "-m", "fixture"],
+                check=True,
+            )
+            profile = profile_repo.profile_repository(repository)
+        provenance = profile["subject"]["source_provenance"]
+        self.assertEqual("verified", provenance["status"])
+        labels = _external_payload(
+            _labels_from_profile(profile), provenance["repository"], provenance["commit"]
+        )
         predictions = _prediction_payload(profile)
         result = evaluate_holdout.evaluate(labels, predictions)
         self.assertEqual(1.0, result["supported_aggregate"]["exact_label_set_accuracy"])
         self.assertEqual(0, result["supported_aggregate"]["false_required_count"])
+        self.assertEqual("development-only", result["status"])
+        self.assertFalse(result["headline_eligible"])
         with tempfile.TemporaryDirectory() as temporary:
             label_path = Path(temporary) / "labels.json"
             prediction_path = Path(temporary) / "predictions.json"
@@ -347,10 +416,17 @@ steps:
                 self.assertEqual(
                     0,
                     contextsec.main(
-                        ["evaluate-holdout", str(label_path), str(prediction_path)]
+                        [
+                            "evaluate-holdout",
+                            str(label_path),
+                            str(prediction_path),
+                            "--allow-unsigned-development",
+                        ]
                     ),
                 )
-            self.assertEqual("pass", json.loads(output.getvalue())["status"])
+            self.assertEqual(
+                "development-only", json.loads(output.getvalue())["status"]
+            )
 
 
 if __name__ == "__main__":

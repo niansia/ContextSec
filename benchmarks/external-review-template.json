@@ -1,6 +1,6 @@
 {
-  "$schema": "https://raw.githubusercontent.com/niansia/ContextSec/v0.3.2/benchmarks/external-review.schema.json",
-  "version": "0.4-protocol-2",
+  "$schema": "https://raw.githubusercontent.com/niansia/ContextSec/v0.4.0/benchmarks/external-review.schema.json",
+  "version": "0.4-protocol-3",
   "status": "template",
   "sampling_frame": {
     "population": "Define the repository population before selecting cases.",
@@ -11,7 +11,11 @@
   },
   "review_policy": {
     "detector_implementers_excluded": true,
+    "contextsec_contributors_excluded": true,
     "reviewers_label_before_tool_output": true,
+    "reviewers_from_distinct_organizations": true,
+    "adjudicator_independent_of_reviewers": true,
+    "conflicts_disclosed": true,
     "disagreements_retained": true,
     "minimum_reviewers_per_case": 2
   },

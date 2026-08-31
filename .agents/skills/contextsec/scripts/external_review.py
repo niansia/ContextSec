@@ -21,7 +21,7 @@ import profile_repo  # noqa: E402
 import safe_io  # noqa: E402
 
 LABEL_STATES = ("required", "candidate", "inactive", "unknown")
-SCHEMA_URL = "https://raw.githubusercontent.com/niansia/ContextSec/v0.3.2/benchmarks/external-review.schema.json"
+SCHEMA_URL = "https://raw.githubusercontent.com/niansia/ContextSec/v0.4.0/benchmarks/external-review.schema.json"
 
 
 def _load(path: Path) -> Dict[str, Any]:
@@ -129,7 +129,11 @@ def evaluate(payload: Mapping[str, Any]) -> Dict[str, Any]:
     policy = payload.get("review_policy")
     expected_policy = {
         "detector_implementers_excluded": True,
+        "contextsec_contributors_excluded": True,
         "reviewers_label_before_tool_output": True,
+        "reviewers_from_distinct_organizations": True,
+        "adjudicator_independent_of_reviewers": True,
+        "conflicts_disclosed": True,
         "disagreements_retained": True,
         "minimum_reviewers_per_case": 2,
     }
@@ -152,7 +156,6 @@ def evaluate(payload: Mapping[str, Any]) -> Dict[str, Any]:
             "repository",
             "commit",
             "framework_group",
-            "support_class",
             "license_spdx",
             "license_evidence_url",
             "selection_rank",
@@ -169,10 +172,11 @@ def evaluate(payload: Mapping[str, Any]) -> Dict[str, Any]:
         ids.append(case_id)
         if re.fullmatch(r"[a-f0-9]{40}", str(case.get("commit", ""))) is None:
             raise ValueError("External review cases must pin full commit IDs.")
-        if case.get("support_class") not in {"supported", "partial", "unsupported"}:
-            raise ValueError("External review support_class is invalid.")
-        if not isinstance(case.get("repository"), str) or not case["repository"]:
-            raise ValueError("External review repository is invalid.")
+        if re.fullmatch(
+            r"https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+",
+            str(case.get("repository", "")),
+        ) is None:
+            raise ValueError("External review repository must be a canonical GitHub URL.")
         if not isinstance(case.get("license_spdx"), str) or not case["license_spdx"]:
             raise ValueError("External review license_spdx is required.")
         if re.fullmatch(r"https://[^\s]+", str(case.get("license_evidence_url", ""))) is None:
@@ -191,25 +195,44 @@ def evaluate(payload: Mapping[str, Any]) -> Dict[str, Any]:
             if not isinstance(reviewer, dict) or set(reviewer) != {
                 "reviewer_id",
                 "implemented_detectors",
+                "contextsec_contributor",
+                "organization",
+                "conflicts_of_interest",
                 "expertise_class",
+                "labels_frozen_at",
                 "labels",
             }:
                 raise ValueError(role + " has an invalid shape.")
             if reviewer.get("implemented_detectors") is not False:
                 raise ValueError("Detector implementers cannot label the external holdout.")
+            if reviewer.get("contextsec_contributor") is not False:
+                raise ValueError("ContextSec contributors cannot label the external holdout.")
             if not isinstance(reviewer.get("reviewer_id"), str) or not reviewer["reviewer_id"]:
                 raise ValueError(role + " requires a reviewer_id.")
             if not isinstance(reviewer.get("expertise_class"), str) or not reviewer["expertise_class"]:
                 raise ValueError(role + " requires an expertise_class.")
+            if not isinstance(reviewer.get("organization"), str) or not reviewer["organization"]:
+                raise ValueError(role + " requires an organization.")
+            if reviewer.get("conflicts_of_interest") != []:
+                raise ValueError(role + " must disclose and resolve conflicts of interest.")
+            try:
+                date.fromisoformat(str(reviewer.get("labels_frozen_at", "")))
+            except ValueError:
+                raise ValueError(role + ".labels_frozen_at must be YYYY-MM-DD.")
             reviewers.append(_labels(reviewer.get("labels"), role + ".labels"))
         if case["annotator_a"]["reviewer_id"] == case["annotator_b"]["reviewer_id"]:
             raise ValueError("External cases require two distinct reviewers.")
+        if case["annotator_a"]["organization"] == case["annotator_b"]["organization"]:
+            raise ValueError("External reviewers must come from distinct organizations.")
         consensus = case.get("consensus")
         if not isinstance(consensus, dict) or set(consensus) != {
             "labels",
             "adjudication_reason",
             "adjudicator_id",
             "adjudicator_implemented_detectors",
+            "adjudicator_contextsec_contributor",
+            "adjudicator_organization",
+            "adjudicator_conflicts_of_interest",
         }:
             raise ValueError("Consensus must stay separate from raw annotations.")
         consensus_labels = _labels(consensus.get("labels"), "consensus.labels")
@@ -219,6 +242,27 @@ def evaluate(payload: Mapping[str, Any]) -> Dict[str, Any]:
             raise ValueError("Consensus requires an adjudicator_id.")
         if consensus.get("adjudicator_implemented_detectors") is not False:
             raise ValueError("A detector implementer cannot adjudicate the external holdout.")
+        if consensus.get("adjudicator_contextsec_contributor") is not False:
+            raise ValueError("A ContextSec contributor cannot adjudicate the external holdout.")
+        if consensus.get("adjudicator_conflicts_of_interest") != []:
+            raise ValueError("The adjudicator must disclose and resolve conflicts of interest.")
+        if (
+            not isinstance(consensus.get("adjudicator_organization"), str)
+            or not consensus["adjudicator_organization"]
+        ):
+            raise ValueError("Consensus requires an adjudicator organization.")
+        reviewer_ids = {
+            case["annotator_a"]["reviewer_id"],
+            case["annotator_b"]["reviewer_id"],
+        }
+        reviewer_organizations = {
+            case["annotator_a"]["organization"],
+            case["annotator_b"]["organization"],
+        }
+        if consensus["adjudicator_id"] in reviewer_ids:
+            raise ValueError("The adjudicator must be distinct from both reviewers.")
+        if consensus["adjudicator_organization"] in reviewer_organizations:
+            raise ValueError("The adjudicator must be organizationally independent.")
         framework = case.get("framework_group")
         if not isinstance(framework, str) or not framework:
             raise ValueError("External cases require a framework_group.")
@@ -237,7 +281,6 @@ def evaluate(payload: Mapping[str, Any]) -> Dict[str, Any]:
                 "repository": case["repository"],
                 "commit": case["commit"],
                 "framework_group": framework,
-                "support_class": case["support_class"],
                 "license_spdx": case["license_spdx"],
                 "license_evidence_url": case["license_evidence_url"],
                 "selection_rank": case["selection_rank"],
@@ -247,7 +290,12 @@ def evaluate(payload: Mapping[str, Any]) -> Dict[str, Any]:
                     case["annotator_a"]["expertise_class"],
                     case["annotator_b"]["expertise_class"],
                 ],
+                "annotator_organizations": [
+                    case["annotator_a"]["organization"],
+                    case["annotator_b"]["organization"],
+                ],
                 "adjudicator_id": consensus["adjudicator_id"],
+                "adjudicator_organization": consensus["adjudicator_organization"],
                 "disagreement_packs": case_disagreements,
                 "consensus_labels": consensus_labels,
             }
@@ -258,7 +306,7 @@ def evaluate(payload: Mapping[str, Any]) -> Dict[str, Any]:
     if len(ranks) != len(set(ranks)):
         raise ValueError("External review selection_rank values must be unique.")
     return {
-        "schema_version": "0.1.0",
+        "schema_version": "0.4.0",
         "suite": "independent_external_labels",
         "status": "pass",
         "manifest_version": payload.get("version"),

@@ -30,8 +30,8 @@ body:
   - type: textarea
     id: labels
     attributes:
-      label: Independent annotations
-      description: List required and candidate packs, coverage limitations, reviewer identity or method, and any disagreement. Do not run or paste target code.
+      label: Independent review evidence
+      description: Link an attested manifest following the external protocol. Reviewers must be non-contributors from distinct organizations, freeze labels before predictions, disclose conflicts, preserve disagreement, and use an independent adjudicator. Do not paste target code or self-declare support class.
     validations:
       required: true
   - type: checkboxes
@@ -40,4 +40,6 @@ body:
       label: Review boundary
       options:
         - label: The repository is public and the proposed evaluation only profiles bounded text without executing target code.
+          required: true
+        - label: Neither reviewer nor the adjudicator has contributed to ContextSec, and all three organizations are distinct.
           required: true

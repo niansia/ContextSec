@@ -7,6 +7,8 @@ from pathlib import Path
 
 SKILL_ROOT = Path(__file__).resolve().parents[1]
 TOOL_VERSION_PATH = SKILL_ROOT / "VERSION"
+DETECTOR_VERSION_PATH = SKILL_ROOT / "DETECTOR_VERSION"
+CHECKER_VERSION_PATH = SKILL_ROOT / "CHECKER_VERSION"
 SCHEMA_VERSION_PATH = SKILL_ROOT / "references" / "SCHEMA_VERSION"
 SEMVER = re.compile(
     r"(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)"
@@ -25,4 +27,6 @@ def _load_version(path: Path, label: str) -> str:
 
 
 TOOL_VERSION = _load_version(TOOL_VERSION_PATH, "tool")
+DETECTOR_VERSION = _load_version(DETECTOR_VERSION_PATH, "detector")
+CHECKER_VERSION = _load_version(CHECKER_VERSION_PATH, "checker")
 SCHEMA_VERSION = _load_version(SCHEMA_VERSION_PATH, "schema")

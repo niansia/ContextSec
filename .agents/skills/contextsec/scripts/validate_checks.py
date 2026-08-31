@@ -14,16 +14,15 @@ from typing import Any, List, Mapping, Optional, Sequence, Set
 import versioning
 import safe_io
 import profile_repo
+import check_controls
 
 REFERENCE_DIR = Path(__file__).resolve().parents[1] / "references"
 CATALOG = safe_io.read_json_object_bounded(
     REFERENCE_DIR / "catalog.json", 4 * 1024 * 1024, "Pack catalog"
 )
 PACKS = {item["id"] for item in CATALOG["packs"]}
-CHECKER_VERSION = versioning.TOOL_VERSION
-CHECKER_MODEL_DIGEST = "sha256:" + hashlib.sha256(
-    safe_io.read_regular_file(Path(__file__).with_name("check_controls.py"), 4 * 1024 * 1024)
-).hexdigest()
+CHECKER_VERSION = versioning.CHECKER_VERSION
+CHECKER_MODEL_DIGEST = check_controls.CHECKER_MODEL_DIGEST
 
 
 def digest(material: str) -> str:
@@ -214,7 +213,7 @@ def validate(payload: Mapping[str, Any]) -> List[str]:
     else:
         exact_keys(
             subject,
-            {"repository", "subject_revision", "source_inventory_digest", "decision_model_digest", "routing_model_digest", "detector_model_digest", "checker_model_digest", "catalog_digest", "composition_digest", "support_matrix_digest", "checker_version", "profile_coverage", "profile_language_support", "checker_coverage", "checker_input_hash"},
+            {"repository", "subject_revision", "source_inventory_digest", "decision_model_digest", "routing_model_digest", "detector_version", "detector_model_digest", "checker_version", "checker_model_digest", "catalog_digest", "composition_digest", "support_matrix_digest", "profile_coverage", "profile_language_support", "checker_coverage", "checker_input_hash"},
             "subject",
             errors,
         )
@@ -277,6 +276,10 @@ def validate(payload: Mapping[str, Any]) -> List[str]:
         for field, expected_digest in expected_digests.items():
             if subject.get(field) != expected_digest:
                 errors.append("subject." + field + " does not match the active model")
+        if subject.get("detector_version") != profile_repo.DETECTOR_VERSION:
+            errors.append("subject.detector_version does not match the active detector")
+        if subject.get("checker_version") != CHECKER_VERSION:
+            errors.append("subject.checker_version does not match the active checker")
         if not re.fullmatch(
             r"sha256:[a-f0-9]{64}",
             str(subject.get("source_inventory_digest", "")),

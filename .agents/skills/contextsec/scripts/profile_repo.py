@@ -22,11 +22,13 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
 import safe_io
+import model_digest
+import source_provenance
 import support_matrix
 import versioning
 
 SCHEMA_VERSION = versioning.SCHEMA_VERSION
-DETECTOR_VERSION = versioning.TOOL_VERSION
+DETECTOR_VERSION = versioning.DETECTOR_VERSION
 DEFAULT_MAX_FILES = 10_000
 DEFAULT_MAX_FILE_BYTES = 512 * 1024
 DEFAULT_MAX_TOTAL_BYTES = 50 * 1024 * 1024
@@ -116,23 +118,90 @@ def canonical_digest(value: Any) -> str:
 
 
 def detector_model_digest() -> str:
-    """Digest the live detector implementation without trusting import-time state."""
+    """Digest only normalized detector/evidence behavior and its live dependencies."""
 
-    return "sha256:" + hashlib.sha256(
-        safe_io.read_regular_file(Path(__file__), 4 * 1024 * 1024)
-    ).hexdigest()
+    symbols = (
+        "DEFAULT_MAX_FILES",
+        "DEFAULT_MAX_FILE_BYTES",
+        "DEFAULT_MAX_TOTAL_BYTES",
+        "MAX_CONTEXT_BYTES",
+        "EXCLUDED_DIRS",
+        "DOCUMENTATION_DIRS",
+        "TEST_DIRS",
+        "DOCUMENTATION_SUFFIXES",
+        "SOURCE_SUFFIXES",
+        "PROFILE_SUPPORTED_MANIFESTS",
+        "PROFILE_UNSUPPORTED_MANIFESTS",
+        "PROFILE_SUPPORTED_SUFFIXES",
+        "PROFILE_UNSUPPORTED_SUFFIXES",
+        "TENANT_KEY_PATTERN",
+        "TENANT_PREDICATE_PATTERN",
+        "MANIFEST_NAMES",
+        "TEXT_DETECTORS",
+        "KNOWN_CAPABILITIES",
+        "DETECTOR_CAPABILITIES",
+        "CAPABILITY_CONTEXT_PACKS",
+        "TextDetector",
+        "WalkStats",
+        "sha256_text",
+        "path_identity",
+        "evidence_semantics",
+        "detector_contracts",
+        "reject_duplicate_keys",
+        "strict_json_loads",
+        "classify_scope",
+        "is_supported_file",
+        "is_environment_file",
+        "sanitize_environment_text",
+        "profile_stack_family",
+        "has_reparse_attribute",
+        "is_link_like",
+        "line_number",
+        "make_observation",
+        "inspect_package_json",
+        "_strip_manifest_comment",
+        "_dependency_name",
+        "python_dependency_specs",
+        "python_manifest_indirections",
+        "inspect_python_manifest",
+        "inspect_text",
+        "language_for_path",
+        "sql_dash_starts_comment",
+        "sql_hash_starts_comment",
+        "mask_comments_and_strings",
+        "iter_repository_files",
+        "build_capabilities",
+    )
+    return model_digest.semantic_model_digest(
+        path=Path(__file__),
+        symbols=symbols,
+        dependencies={
+            "safe_io": model_digest.semantic_module_digest(Path(safe_io.__file__)),
+            "source_provenance": model_digest.semantic_module_digest(
+                Path(source_provenance.__file__)
+            ),
+            "support_matrix": canonical_digest(support_matrix.SUPPORT_MATRIX),
+        },
+    )
 
 
 def routing_model_digest() -> str:
     """Digest every input that can change routing or applicability decisions."""
 
-    return canonical_digest(
-        {
+    return model_digest.semantic_model_digest(
+        path=Path(__file__),
+        symbols=(
+            "load_declarations",
+            "confidence_for",
+            "build_claims",
+            "build_routing",
+        ),
+        dependencies={
             "detector_model_digest": detector_model_digest(),
             "catalog_digest": canonical_digest(PACK_CATALOG),
             "composition_digest": canonical_digest(COMPOSITION_CATALOG),
             "support_matrix_digest": canonical_digest(support_matrix.SUPPORT_MATRIX),
-        }
+        },
     )
 
 
@@ -2347,12 +2416,32 @@ def profile_repository(
     max_file_bytes: int = DEFAULT_MAX_FILE_BYTES,
     max_total_bytes: int = DEFAULT_MAX_TOTAL_BYTES,
     path_privacy: str = "heuristic",
+    provenance_root: Optional[Path] = None,
+    component: Optional[Mapping[str, str]] = None,
 ) -> Dict[str, Any]:
     root = root.resolve(strict=True)
     if not root.is_dir():
         raise ValueError("Repository root is not a directory: " + str(root))
     if path_privacy not in PATH_PRIVACY_MODES:
         raise ValueError("Unsupported path privacy mode: " + path_privacy)
+    source_root = provenance_root.resolve(strict=True) if provenance_root else root
+    source = source_provenance.read(source_root)
+    component_binding: Optional[Dict[str, str]] = None
+    if component is not None:
+        component_id = component.get("id")
+        component_root = component.get("root")
+        if (
+            not isinstance(component_id, str)
+            or re.fullmatch(r"[a-z][a-z0-9_-]{0,63}", component_id) is None
+            or not isinstance(component_root, str)
+            or not component_root
+        ):
+            raise ValueError("Component binding is invalid.")
+        component_binding = {
+            "id": component_id,
+            "root": redact_path(component_root, path_privacy),
+            "path_identity": path_identity(component_root),
+        }
     declarations = load_declarations(context_file)
     observations: List[Dict[str, Any]] = []
     file_hashes: List[str] = []
@@ -2379,7 +2468,7 @@ def profile_repository(
     max_entries = max(1_000, max_files * 20)
     limitations = [
         "Static evidence only: absence of a detector match remains unknown.",
-        "v0.3 detectors are strongest for Node.js, Python manifests, Next.js, FastAPI, Django, Prisma, Terraform, and common CI workflow shapes; other stacks may need manual profiling.",
+        "v0.4 detectors are strongest for Node.js, Python manifests, Next.js, FastAPI, Django, Prisma, Terraform, and common CI workflow shapes; other stacks may need manual profiling.",
         "Documentation, tests, fixtures, generated output, dependencies, and symlinks do not drive routing.",
         "No target code, build, test, scanner, network call, or compliance assessment was executed.",
         "Source-content values are never emitted; repository-relative paths use the "
@@ -2549,6 +2638,10 @@ def profile_repository(
         "detector=" + DETECTOR_VERSION,
         "detector-model=" + DETECTOR_MODEL_DIGEST,
         "decision-model=" + DECISION_MODEL_DIGEST,
+        "source-provenance="
+        + json.dumps(source, sort_keys=True, separators=(",", ":")),
+        "component="
+        + json.dumps(component_binding, sort_keys=True, separators=(",", ":")),
         "declarations="
         + json.dumps(declarations, sort_keys=True, separators=(",", ":")),
         "limits="
@@ -2583,10 +2676,13 @@ def profile_repository(
         "artifact_options": {"path_privacy": path_privacy},
         "subject": {
             "repository": redact_path(root.name, path_privacy),
+            "source_provenance": source,
+            "component": component_binding,
             "subject_revision": subject_revision,
             "source_inventory_digest": source_inventory_digest,
             "decision_model_digest": DECISION_MODEL_DIGEST,
             "routing_model_digest": ROUTING_MODEL_DIGEST,
+            "detector_version": DETECTOR_VERSION,
             "detector_model_digest": DETECTOR_MODEL_DIGEST,
             "catalog_digest": CATALOG_DIGEST,
             "composition_digest": COMPOSITION_DIGEST,
@@ -2699,7 +2795,7 @@ def render_markdown(profile: Mapping[str, Any]) -> str:
             )
     lines.extend(["", "## Evidence (redacted)", ""])
     if not profile["observations"]:
-        lines.append("No production observations matched the v0.3 detectors.")
+        lines.append("No production observations matched the v0.4 detectors.")
     else:
         for item in profile["observations"]:
             evidence = item["evidence"]

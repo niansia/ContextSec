@@ -43,9 +43,9 @@ generate / review / test
 Control Ledger + evidence + release gate
 ```
 
-**Status:** research preview `v0.3.3`. Local-first, read-only profiling, no source upload, no target-code execution, and no third-party runtime dependency.
+**Status:** research preview `v0.4.0`. Local-first, read-only profiling, no source upload, no target-code execution, and no third-party runtime dependency.
 
-**Versioning:** Release/tool versions and artifact schema versions are independent and each has one canonical file. v0.3.3 keeps artifact schemas at `0.3.2`; it is a release-verifier compatibility hotfix on top of the v0.3.2 evidence-identity model.
+**Versioning:** Tool, detector, checker, and artifact-schema versions are independent and each has one canonical file. Their semantic model digests bind the behavior and dependencies that affect each artifact while ignoring comments and formatting.
 
 ## The decision pipeline
 
@@ -120,6 +120,7 @@ The profiler emits versioned observations, claims, routing, contradictions, and 
 - `fingerprint`: evidence identity bound to the content digest;
 - `subject_revision`: the bounded repository scope plus active routing model evaluated by this run;
 - `source_inventory_digest`: the exact supported production file inventory shared by profiler and checker, used to reject mid-evaluation source changes.
+- `source_provenance`: a canonical Git origin, full commit, and clean/dirty worktree state; only all-three verified can bind a Profile to a frozen external case.
 
 These hashes are integrity identifiers, not secrecy mechanisms. ContextSec never emits matched source lines or source-content values. Repository-relative filenames use bounded heuristic redaction by default and may themselves contain personal data; use `--path-privacy hashed` or `--path-privacy opaque` when filenames are sensitive. Those modes are deterministic pseudonymization, not secrecy: low-entropy filenames can still be guessed by hashing candidate paths. The selected policy is explicit in `artifact_options.path_privacy` and never changes canonical path identity.
 
@@ -127,7 +128,7 @@ These hashes are integrity identifiers, not secrecy mechanisms. ContextSec never
 
 [The machine-readable catalog](.agents/skills/contextsec/references/catalog.json) is the single source for pack order, claims, dependencies, per-control `applies_when` conditions, 16 risk packs, and 116 controls. Its [JSON Schema](.agents/skills/contextsec/references/catalog.schema.json) and semantic validator reject malformed fields—including string values masquerading as booleans. Human-readable pack files add implementation and verification guidance.
 
-The [machine-readable support matrix](.agents/skills/contextsec/references/support-matrix.json) and its [JSON Schema](.agents/skills/contextsec/references/support-matrix.schema.json) define profiler/checker manifests, suffixes, framework families, coverage semantics, and the ten published deterministic checker shapes. `contextsec doctor` reports that complete contract plus the separate routing, detector, checker, catalog, composition, and support-matrix digests.
+The [machine-readable support matrix](.agents/skills/contextsec/references/support-matrix.json) and its [JSON Schema](.agents/skills/contextsec/references/support-matrix.schema.json) define profiler/checker manifests, suffixes, framework families, coverage semantics, and the ten published deterministic checker families. `contextsec doctor` reports that complete contract plus the separate routing, detector, checker, catalog, composition, and support-matrix digests.
 
 ### Composition engine
 
@@ -140,6 +141,22 @@ The [machine-readable support matrix](.agents/skills/contextsec/references/suppo
 - SaaS OAuth + PII;
 - CI/CD + cloud IAM;
 - AI + high-impact transactions.
+
+### Monorepo component model
+
+A monorepo is not treated as one blended application. `profile-components` consumes an explicit component model, rejects duplicate or overlapping roots, unknown dependencies, dependency cycles, and flows with unknown endpoints, then emits one independently source-bound Profile per component plus declared cross-component flows. The aggregate artifact binds the component manifest digest and each component Profile digest.
+
+```bash
+python .agents/skills/contextsec/scripts/contextsec.py profile-components \
+  --repo . \
+  --components component-model.json \
+  --output component-profile.json
+
+python .agents/skills/contextsec/scripts/contextsec.py validate-component-profile \
+  component-profile.json
+```
+
+Cross-component flow declarations require named capabilities and evidence references; they do not silently convert component co-location into a proven data flow.
 
 ### Control Evaluation Ledger and release gate
 
@@ -273,7 +290,7 @@ Run every offline benchmark suite:
 python .agents/skills/contextsec/scripts/contextsec.py benchmark --suite all
 ```
 
-v0.3 keeps evidence classes separate:
+v0.4 keeps evidence classes separate:
 
 | Suite | Scope | Current result | What it does **not** prove |
 |---|---:|---:|---|
@@ -283,7 +300,15 @@ v0.3 keeps evidence classes separate:
 | Pinned real repositories | 4 exact public commits | 4/4 expected profiles reproduced | a statistically representative sample |
 | Adversarial performance | 6 generated pathological files at 500 KiB each | bounded runtime, offset preservation, non-disclosure, fail-closed malformed TOML | universal CPU bounds on every machine |
 
-The profile labels are maintainer-authored, including the frozen evaluation split. The real-repository suite requires existing local checkouts, verifies `HEAD`, and never clones or executes target code. The [independent evaluation protocol](docs/external-evaluation-protocol.md) freezes sampling, licenses, reviewer expertise, two-reviewer raw labels, non-implementer adjudication, and agreement reporting without pretending those third-party labels already exist. `external-review` measures annotation agreement; the separate `evaluate-holdout` command compares frozen consensus with pinned, model-bound Profile artifacts while keeping supported, partial, and unsupported cases separate. See the [benchmark method](docs/benchmark-methodology.md) and [real-repository cases](docs/real-repo-cases.md).
+The profile labels are maintainer-authored, including the frozen evaluation split. The real-repository suite requires existing local checkouts, verifies `HEAD`, and never clones or executes target code. The [independent evaluation protocol](docs/external-evaluation-protocol.md) excludes all ContextSec contributors, requires reviewers from distinct organizations, freezes labels before tool output, discloses conflicts, and retains disagreements. `support_class` is derived from each commit-bound Profile rather than trusted from a manifest. `evaluate-holdout` is headline-eligible only when signer-constrained GitHub attestations verify both artifacts and trusted timestamps prove labels predate predictions; unsigned runs require an explicit development flag and are marked `development-only`. See the [benchmark method](docs/benchmark-methodology.md) and [real-repository cases](docs/real-repo-cases.md).
+
+Exact verification coverage is public and deliberately non-inflated:
+
+```bash
+python .agents/skills/contextsec/scripts/contextsec.py verification-coverage
+```
+
+Every one of the 116 catalog controls and nine composition controls is classified as either `automated` or `evidence-required`. `automated` means a supported deterministic checker or repository-policy audit exists; it never means that a control passed for a particular repository.
 
 The [incident corpus](incidents) stores confirmed facts separately from ContextSec inferences and maps each case to trust boundaries, controls, and a proposed regression mutation. It currently includes Zeabur's ongoing 2026 investigation, tj-actions, Coinbase support insiders, Salesloft Drift OAuth abuse, and an NPM→GitHub OIDC→AWS control-plane pivot.
 
@@ -311,6 +336,7 @@ python -m compileall -q .agents/skills/contextsec/scripts tests
 python .agents/skills/contextsec/scripts/contextsec.py validate-catalog
 python .agents/skills/contextsec/scripts/contextsec.py benchmark --suite all
 python .agents/skills/contextsec/scripts/audit_ci.py --repo .
+python .agents/skills/contextsec/scripts/contextsec.py verification-coverage
 python .agents/skills/contextsec/scripts/contextsec.py explain secrets-management --repo .
 ```
 
@@ -319,8 +345,8 @@ python .agents/skills/contextsec/scripts/contextsec.py explain secrets-managemen
 - Detectors are strongest for Node.js, Python dependency manifests, Next.js, FastAPI, Django, Prisma, Terraform, and common CI workflow shapes. Other stacks may need manual evidence or future adapters.
 - The lexical adapters are deterministic but are not full language parsers. Every detector needs positive/negative twins, and ambiguous evidence remains candidate or unknown.
 - Race-resistant descriptor reads reject observed replacement and in-place mutation, but ContextSec does not create an operating-system-wide atomic filesystem snapshot.
-- The built-in control checks cover ten narrow code/configuration shapes. Tenant CRUD checks enumerate every supported call in scope; several other checkers still enumerate only their first supported finding. The ledger exposes that coverage instead of implying completeness.
-- The subject revision and content digests bind bounded inputs; they are not a signed commit attestation and cannot prove skipped input safe.
+- The built-in control checks remain narrow. The exact 125-row verification-coverage artifact distinguishes automated methods from evidence-required controls; neither classification proves a repository passed.
+- A verified source provenance binds a clean checkout to its Git commit and canonical origin, but it is not by itself a signature and cannot prove skipped input safe.
 - Release evidence supplied by an owner still needs trustworthy test/configuration provenance. The ledger records the assertion; it cannot magically establish its truth.
 - Static CI audit evidence deliberately leaves release provenance `unknown`; a specific tag run must build, attest, publish a draft, re-download it, and verify its checksums and attestations before publication.
 - Standards mappings are navigation aids. ContextSec does not certify PCI DSS, GDPR, HIPAA, SOC 2, or any other compliance state.
@@ -328,11 +354,9 @@ python .agents/skills/contextsec/scripts/contextsec.py explain secrets-managemen
 
 ## Roadmap
 
-1. **v0.2.1 — applicability correctness:** language-aware lexical policy, one-profile subject binding, per-control applicability, flow-aware compositions, catalog validation, and cross-platform release metadata.
-2. **v0.3.1 — boundary and provenance hardening:** race-resistant reads, stdlib TOML, explicit path privacy, adversarial performance bounds, machine-readable support, hash-pinned validator dependencies, and attested immutable release automation.
-3. **v0.3.2 — evidence identity hardening:** root-anchored reads, full canonical identities, correlation-aware confidence, complete reusable release proof, conservative CI evidence, bounded artifact readers, and holdout evaluation tooling.
-4. **v0.3.3 — release verifier compatibility:** checksum-pin a current GitHub CLI, verify release predicate v0.2, and tolerate bounded platform attestation availability delay while remaining fail-closed.
-5. **v0.4 — independent ecosystem proof:** collect qualified external labels, add component-scoped monorepos and Profile Diff, bind signed verification evidence, and run comparative multi-agent evaluation.
+1. **v0.2–v0.3 — deterministic decision proof:** applicability correctness, evidence identity, mutation coverage, reproducible packages, complete CI proof, and fail-closed release attestation verification.
+2. **v0.4 — trust-closure contracts:** independent tool/detector/checker versions, semantic model digests, clean commit-bound Profiles, explicit monorepo components, strict external-review independence, attestation-gated holdouts, exact verification coverage, and exact-main immutable release evidence.
+3. **Next — collect external ground truth:** qualified third parties must populate the already-frozen protocol; comparative agent studies and broader checker/framework coverage remain future evidence, not current claims.
 
 Read [architecture](docs/architecture.md), [competitive positioning](docs/competitive-positioning.md), [v0.2.1 review resolution](docs/review-resolution-v0.2.1.md), and [release roadmap](docs/roadmap.md) before proposing a large feature.
 

@@ -148,15 +148,34 @@ Release gate:
 - the pinned verifier version must be active before any release mutation;
 - release, tag, commit, and asset digests must verify against the GitHub-issued release attestation.
 
-## v0.4 - Ecosystem proof
+## v0.4 - Trust closure and component evidence
 
-- externally labeled repositories from a declared sampling frame, with reviewer disagreements retained;
-- component-scoped monorepo profiles and cross-component flows;
-- framework adapters without duplicating canonical controls;
-- comparison against no-skill and generic-security baselines across multiple coding agents;
-- signed/pinned pack provenance and permission manifests;
-- contributor certification through held-out scenarios;
-- public benchmark methodology and real "Routed by ContextSec, found and verified by the agent/tool" cases.
+Delivered scope:
+
+- independent canonical tool, detector, checker, and schema versions plus dependency-aware semantic model digests;
+- Profile source provenance bound to a canonical Git origin, full commit, and clean worktree;
+- component-scoped monorepo Profiles with non-overlapping roots, acyclic dependencies, and explicit evidence-referenced cross-component flows;
+- a stricter external-label contract excluding every ContextSec contributor, requiring distinct reviewer organizations, frozen pre-output labels, conflict disclosure, retained disagreements, and independent adjudication;
+- support class derived from each frozen commit-bound Profile rather than supplied by the label manifest;
+- attestation verification for label and prediction artifacts, with unsigned results restricted to `development-only` and never headline-eligible;
+- exact automated-versus-evidence-required classification for all 116 catalog controls and nine compositions;
+- CI audit of digest-pinned containers and exact effective job-level token permissions;
+- pre-build Immutable Releases verification, release-environment approval, exact tag-to-`main` equality, and attested release evidence binding the complete proof, model identities, coverage, and archive.
+
+Release gate:
+
+- all local contracts, benchmarks, CI policy audits, and deterministic package checks pass;
+- no release build begins unless Immutable Releases is already enabled;
+- the tagged commit equals current reviewed `main`, not merely an ancestor;
+- release evidence and every published asset verify locally and after draft re-download before publication;
+- independent ecosystem accuracy remains unclaimed until qualified third parties contribute attested labels and predictions under the frozen protocol.
+
+## Next evidence milestone
+
+- collect externally labeled repositories from the frozen sampling protocol without maintainer participation;
+- compare no-skill, generic-security, and ContextSec-assisted baselines across multiple coding agents;
+- expand framework adapters and mutation-backed checker coverage without duplicating canonical controls;
+- publish real “Routed by ContextSec, found and verified by the agent/tool” cases.
 
 ## Deliberately deferred
 

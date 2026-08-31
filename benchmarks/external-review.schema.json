@@ -1,11 +1,11 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/niansia/ContextSec/v0.3.2/benchmarks/external-review.schema.json",
+  "$id": "https://raw.githubusercontent.com/niansia/ContextSec/v0.4.0/benchmarks/external-review.schema.json",
   "title": "ContextSec Independent External Review Manifest",
   "type": "object",
   "required": ["$schema", "version", "status", "sampling_frame", "review_policy", "cases"],
   "properties": {
-    "$schema": {"const": "https://raw.githubusercontent.com/niansia/ContextSec/v0.3.2/benchmarks/external-review.schema.json"},
+    "$schema": {"const": "https://raw.githubusercontent.com/niansia/ContextSec/v0.4.0/benchmarks/external-review.schema.json"},
     "version": {"type": "string", "minLength": 1},
     "status": {"enum": ["template", "complete"]},
     "sampling_frame": {
@@ -23,7 +23,11 @@
     "review_policy": {
       "const": {
         "detector_implementers_excluded": true,
+        "contextsec_contributors_excluded": true,
         "reviewers_label_before_tool_output": true,
+        "reviewers_from_distinct_organizations": true,
+        "adjudicator_independent_of_reviewers": true,
+        "conflicts_disclosed": true,
         "disagreements_retained": true,
         "minimum_reviewers_per_case": 2
       }
@@ -65,35 +69,41 @@
     },
     "annotator": {
       "type": "object",
-      "required": ["reviewer_id", "implemented_detectors", "expertise_class", "labels"],
+      "required": ["reviewer_id", "implemented_detectors", "contextsec_contributor", "organization", "conflicts_of_interest", "expertise_class", "labels_frozen_at", "labels"],
       "properties": {
         "reviewer_id": {"type": "string", "minLength": 1},
         "implemented_detectors": {"const": false},
+        "contextsec_contributor": {"const": false},
+        "organization": {"type": "string", "minLength": 1},
+        "conflicts_of_interest": {"const": []},
         "expertise_class": {"type": "string", "minLength": 1},
+        "labels_frozen_at": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"},
         "labels": {"$ref": "#/$defs/labels"}
       },
       "additionalProperties": false
     },
     "consensus": {
       "type": "object",
-      "required": ["labels", "adjudication_reason", "adjudicator_id", "adjudicator_implemented_detectors"],
+      "required": ["labels", "adjudication_reason", "adjudicator_id", "adjudicator_implemented_detectors", "adjudicator_contextsec_contributor", "adjudicator_organization", "adjudicator_conflicts_of_interest"],
       "properties": {
         "labels": {"$ref": "#/$defs/labels"},
         "adjudication_reason": {"type": "string", "minLength": 1},
         "adjudicator_id": {"type": "string", "minLength": 1},
-        "adjudicator_implemented_detectors": {"const": false}
+        "adjudicator_implemented_detectors": {"const": false},
+        "adjudicator_contextsec_contributor": {"const": false},
+        "adjudicator_organization": {"type": "string", "minLength": 1},
+        "adjudicator_conflicts_of_interest": {"const": []}
       },
       "additionalProperties": false
     },
     "case": {
       "type": "object",
-      "required": ["id", "repository", "commit", "framework_group", "support_class", "license_spdx", "license_evidence_url", "selection_rank", "sampling_reason", "frozen_at", "annotator_a", "annotator_b", "consensus"],
+      "required": ["id", "repository", "commit", "framework_group", "license_spdx", "license_evidence_url", "selection_rank", "sampling_reason", "frozen_at", "annotator_a", "annotator_b", "consensus"],
       "properties": {
         "id": {"type": "string", "minLength": 1},
-        "repository": {"type": "string", "minLength": 1},
+        "repository": {"type": "string", "pattern": "^https://github\\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"},
         "commit": {"type": "string", "pattern": "^[a-f0-9]{40}$"},
         "framework_group": {"type": "string", "minLength": 1},
-        "support_class": {"enum": ["supported", "partial", "unsupported"]},
         "license_spdx": {"type": "string", "minLength": 1},
         "license_evidence_url": {"type": "string", "pattern": "^https://"},
         "selection_rank": {"type": "integer", "minimum": 1},

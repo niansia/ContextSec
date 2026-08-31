@@ -25,6 +25,8 @@ ContextSec values small, reproducible evidence over large checklists.
 11. Do not add runtime network access, target execution, automatic high-risk fixes, or compliance claims.
 12. Keep authored regression, frozen maintainer evaluation, mutation, and independently labeled results separate. Do not pool them into one accuracy number.
 13. A mutation counts only when its clean baseline has no target finding and the single-edit mutant emits the expected checker status and control binding.
+14. Update the exact verification-coverage registry when adding or removing a deterministic checker or repository-policy audit; never describe catalog count as automated coverage.
+15. External labels and predictions must use distinct, pinned signer workflows. Only a result whose trusted label timestamp predates its prediction timestamp may be presented as headline-eligible.
 
 Run before opening a pull request:
 

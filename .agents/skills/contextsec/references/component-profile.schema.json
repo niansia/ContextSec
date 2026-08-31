@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/niansia/ContextSec/v0.4.0/.agents/skills/contextsec/references/component-profile.schema.json",
+  "title": "ContextSec Component Profile",
+  "type": "object",
+  "required": ["$schema", "schema_version", "artifact_type", "artifact_options", "subject", "component_model", "components", "flows", "limitations"],
+  "properties": {
+    "$schema": {"const": "https://raw.githubusercontent.com/niansia/ContextSec/v0.4.0/.agents/skills/contextsec/references/component-profile.schema.json"},
+    "schema_version": {"const": "0.4.0"},
+    "artifact_type": {"const": "component-profile"},
+    "artifact_options": {"type": "object"},
+    "subject": {"type": "object"},
+    "component_model": {"$ref": "https://raw.githubusercontent.com/niansia/ContextSec/v0.4.0/.agents/skills/contextsec/references/component-model.schema.json"},
+    "components": {"type": "array", "minItems": 1},
+    "flows": {"type": "array"},
+    "limitations": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}}
+  },
+  "additionalProperties": false
+}

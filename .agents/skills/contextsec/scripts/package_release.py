@@ -31,6 +31,7 @@ ALLOWLIST = (
     "CONTRIBUTING.md",
     "LICENSE",
     "README.md",
+    "RELEASING.md",
     "SECURITY.md",
     "SOURCES.md",
 )
