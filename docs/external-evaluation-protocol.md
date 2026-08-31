@@ -23,13 +23,7 @@ After review and consensus are frozen, create a separate prediction artifact con
 For a publishable result, attest the labels and predictions independently and verify both online while evaluating:
 
 ```bash
-python .agents/skills/contextsec/scripts/contextsec.py evaluate-holdout \
-  completed-external-review.json \
-  completed-holdout-predictions.json \
-  --labels-attestation-repo owner/labels-repository \
-  --predictions-attestation-repo owner/predictions-repository \
-  --labels-signer-workflow https://github.com/owner/labels-repository/.github/workflows/attest.yml \
-  --predictions-signer-workflow https://github.com/owner/predictions-repository/.github/workflows/attest.yml
+python .agents/skills/contextsec/scripts/contextsec.py evaluate-holdout completed-external-review.json completed-holdout-predictions.json --labels-attestation-repo owner/labels-repository --predictions-attestation-repo owner/predictions-repository --labels-signer-workflow https://github.com/owner/labels-repository/.github/workflows/attest.yml --predictions-signer-workflow https://github.com/owner/predictions-repository/.github/workflows/attest.yml
 ```
 
 Both signer-workflow identities are mandatory for a publishable result, so a different workflow in the same repository cannot silently become the evidence issuer. The verified transparency-log timestamp for the frozen label artifact must also predate the prediction artifact's verified timestamp. A local unsigned analysis is available only with `--allow-unsigned-development`; its result is `development-only` and `headline_eligible` is false.
