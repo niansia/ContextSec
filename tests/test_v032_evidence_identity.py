@@ -225,6 +225,11 @@ steps:
         self.assertIn("needs: proof", release)
         self.assertIn("git merge-base --is-ancestor", release)
         self.assertIn("gh attestation verify", release)
+        self.assertIn("gh_2.98.0_linux_amd64.tar.gz", release)
+        self.assertIn(
+            "3b8ac6b30336802fc1a858d7c084e11cdf24ac1a761ca90b68022d7d729208de",
+            release,
+        )
         self.assertIn("for attempt in {1..60}", release)
         self.assertIn("sleep 10", release)
         self.assertIn(

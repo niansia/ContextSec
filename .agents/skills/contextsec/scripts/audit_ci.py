@@ -187,6 +187,8 @@ def audit_repository(root: Path) -> Dict[str, Any]:
         "SHA256SUMS",
         "cmp ",
         "attest-build-provenance",
+        "gh_2.98.0_linux_amd64.tar.gz",
+        "3b8ac6b30336802fc1a858d7c084e11cdf24ac1a761ca90b68022d7d729208de",
         "gh release verify",
     )
     missing_release = [item for item in release_markers if item not in release]

@@ -34,6 +34,21 @@ jobs:
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.14"
+      - name: Install checksum-pinned GitHub CLI release verifier
+        shell: bash
+        run: |
+          archive="gh_2.98.0_linux_amd64.tar.gz"
+          archive_sha256="3b8ac6b30336802fc1a858d7c084e11cdf24ac1a761ca90b68022d7d729208de"
+          curl --proto '=https' --tlsv1.2 --fail --location --retry 3 \
+            --output "$RUNNER_TEMP/$archive" \
+            "https://github.com/cli/cli/releases/download/v2.98.0/$archive"
+          echo "$archive_sha256  $RUNNER_TEMP/$archive" | sha256sum --check
+          mkdir -p "$RUNNER_TEMP/gh-cli"
+          tar -xzf "$RUNNER_TEMP/$archive" --strip-components=1 -C "$RUNNER_TEMP/gh-cli"
+          echo "$RUNNER_TEMP/gh-cli/bin" >> "$GITHUB_PATH"
+      - name: Verify pinned GitHub CLI version
+        shell: bash
+        run: gh version | grep -q '^gh version 2\.98\.0 '
       - name: Verify tag identity and main ancestry
         shell: bash
         run: |
