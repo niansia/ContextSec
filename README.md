@@ -1,5 +1,10 @@
 # ContextSec
 
+[![CI](https://github.com/niansia/ContextSec/actions/workflows/ci.yml/badge.svg)](https://github.com/niansia/ContextSec/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/niansia/ContextSec?display_name=tag&sort=semver)](https://github.com/niansia/ContextSec/releases)
+[![License](https://img.shields.io/github/license/niansia/ContextSec)](LICENSE)
+![Research Preview](https://img.shields.io/badge/status-research%20preview-6f42c1)
+
 ## The product-security decision layer for AI coding agents
 
 > **Your coding agent knows security rules. ContextSec tells it which ones your product actually needs.**
@@ -40,7 +45,7 @@ Control Ledger + evidence + release gate
 
 **Status:** research preview `v0.3.0`. Local-first, read-only profiling, no source upload, no target-code execution, and no third-party runtime dependency.
 
-**Versioning:** Release and tool versions are independent from artifact schema versions. ContextSec `v0.3.0` intentionally retains the compatible `0.2.1` Profile, Checks, Evidence, Catalog, Composition, and Ledger schemas because their serialization contracts did not change.
+**Versioning:** Release/tool versions and artifact schema versions are independent. The current release and schemas are both `0.3.0`, but for different reasons: the artifact schemas moved from `0.2.1` to `0.3.0` because machine-readable stack support and profile/check binding changed their serialization contracts. A future release may retain an older compatible schema version.
 
 ## The decision pipeline
 
@@ -151,8 +156,8 @@ The gate semantics are strict:
 
 - `PASS`: all blocking required controls are verified;
 - `WARN`: only non-blocking or candidate gaps remain;
-- `BLOCK`: a blocking control failed, is unknown, or supported-scope coverage is partial;
-- `WAIVED`: every blocker has a named owner, reason, compensating control, and unexpired waiver evaluated against an explicit date. Consumers must run `validate_ledger.py --as-of <release-date>` so an old waiver artifact cannot be replayed.
+- `BLOCK`: a blocking control failed, is unknown, traversal is partial, or profiler stack support is partial/unsupported;
+- `WAIVED`: every blocker has a named owner, reason, compensating control, and unexpired waiver evaluated against an explicit date. Consumers must run `contextsec.py validate-ledger <ledger> --as-of <release-date>` so an old waiver artifact cannot be replayed.
 
 ## Product-risk packs
 
@@ -265,8 +270,8 @@ v0.3 keeps evidence classes separate:
 | Suite | Scope | Current result | What it does **not** prove |
 |---|---:|---:|---|
 | Authored regression | 13 scenarios / 80 annotations | 80/80 | ecosystem accuracy |
-| Profile evaluation | 36 cases: 20 development + 16 frozen evaluation | macro F1 1.00; safety trigger recall 1.00; 0 false required activations | independent or representative accuracy |
-| Mutation verification | 8 single-edit pairs covering all 8 published checker shapes | 8/8 killed | coverage of all 116 controls or application tests |
+| Profile evaluation | 40 cases: 24 development + 16 frozen evaluation | macro F1 1.00; safety trigger recall 1.00; 0 false required activations | independent or representative accuracy |
+| Mutation verification | 10 single-edit pairs covering all 10 published checker shapes | 10/10 killed | coverage of all 116 controls or application tests |
 | Pinned real repositories | 4 exact public commits | 4/4 expected profiles reproduced | a statistically representative sample |
 
 The profile labels are maintainer-authored, including the frozen evaluation split. The real-repository suite requires existing local checkouts, verifies `HEAD`, and never clones or executes target code. See the [benchmark method](docs/benchmark-methodology.md) and [real-repository cases](docs/real-repo-cases.md).
@@ -278,10 +283,11 @@ The [incident corpus](incidents) stores confirmed facts separately from ContextS
 - Parses bounded local text; never imports, builds, tests, or executes target code.
 - Never uses the network during profiling, checks, benchmark, or ledger evaluation.
 - Ignores repository symlinks and common dependency/generated directories.
-- Documentation, examples, fixtures, tests, and development-only dependencies cannot create production claims.
+- Documentation, examples, fixtures, tests, non-workflow GitHub governance files, and development-only dependencies cannot create production claims.
 - Uses language-aware lexical policies so JavaScript `n--` and `#private`, Python f-string replacement fields, PostgreSQL hash operators, and MySQL no-space subtraction remain executable while supported comment forms are masked.
 - Separates template-literal prose from executable `${...}` expressions.
-- Reports `partial` coverage for traversal, read, byte, encoding, or manifest gaps.
+- Reports `partial` traversal coverage for read, byte, encoding, or manifest gaps, and separately reports supported, partial, or unsupported stack coverage.
+- Parses `.env`-family files as key names only: values are discarded before hashing, evidence generation, or artifact output.
 - Reports checker traversal, language support, checker support, and match enumeration separately.
 - Reads owner declarations only when explicitly supplied; declarations cannot erase contradictory code evidence.
 - Does not modify target source or configuration. Runtime bytecode writes are disabled; artifacts are written only to an explicitly supplied output path.
@@ -292,7 +298,7 @@ The [incident corpus](incidents) stores confirmed facts separately from ContextS
 ```bash
 python -m unittest discover -s tests -v
 python -m compileall -q .agents/skills/contextsec/scripts tests
-python .agents/skills/contextsec/scripts/validate_catalog.py
+python .agents/skills/contextsec/scripts/contextsec.py validate-catalog
 python .agents/skills/contextsec/scripts/contextsec.py benchmark --suite all
 python .agents/skills/contextsec/scripts/contextsec.py explain secrets-management --repo .
 ```
@@ -301,7 +307,7 @@ python .agents/skills/contextsec/scripts/contextsec.py explain secrets-managemen
 
 - Detectors are strongest for Node.js, Python dependency manifests, Next.js, FastAPI, Django, Prisma, Terraform, and common CI workflow shapes. Other stacks may need manual evidence or future adapters.
 - The lexical adapters are deterministic but are not full language parsers. Every detector needs positive/negative twins, and ambiguous evidence remains candidate or unknown.
-- The built-in control checks cover eight narrow code/configuration shapes and often enumerate only the first supported finding. The ledger exposes that coverage instead of implying completeness.
+- The built-in control checks cover ten narrow code/configuration shapes. Tenant CRUD checks enumerate every supported call in scope; several other checkers still enumerate only their first supported finding. The ledger exposes that coverage instead of implying completeness.
 - The subject revision and content digests bind bounded inputs; they are not a signed commit attestation and cannot prove skipped input safe.
 - Release evidence supplied by an owner still needs trustworthy test/configuration provenance. The ledger records the assertion; it cannot magically establish its truth.
 - Standards mappings are navigation aids. ContextSec does not certify PCI DSS, GDPR, HIPAA, SOC 2, or any other compliance state.
@@ -310,7 +316,7 @@ python .agents/skills/contextsec/scripts/contextsec.py explain secrets-managemen
 ## Roadmap
 
 1. **v0.2.1 — applicability correctness:** language-aware lexical policy, one-profile subject binding, per-control applicability, flow-aware compositions, catalog validation, and cross-platform release metadata.
-2. **v0.3.0 — benchmark proof:** Python manifest/model profiling, 36 frozen profile cases, 8 mutation pairs, 4 pinned real-repository cases, and Windows/macOS/Linux × Python 3.11–3.14 CI.
+2. **v0.3.0 — benchmark proof:** Python manifest/model profiling, detector positive/negative contracts, 40 labeled profile cases, 10 mutation pairs, 4 pinned real-repository cases, and Windows/macOS/Linux × Python 3.11–3.14 CI.
 3. **v0.4 — independent ecosystem proof:** externally labeled holdout repositories, component-scoped monorepos, profile diff, signed artifacts, and comparative multi-agent evaluation.
 
 Read [architecture](docs/architecture.md), [competitive positioning](docs/competitive-positioning.md), [v0.2.1 review resolution](docs/review-resolution-v0.2.1.md), and [release roadmap](docs/roadmap.md) before proposing a large feature.

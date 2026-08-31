@@ -74,8 +74,8 @@ class V03BenchmarkTests(unittest.TestCase):
     def test_profile_benchmark_has_frozen_splits_and_meets_gates(self):
         result = BENCHMARK.run_profile_accuracy()
         self.assertEqual("pass", result["status"])
-        self.assertEqual(36, result["case_count"])
-        self.assertEqual(20, result["splits"]["development"]["case_count"])
+        self.assertEqual(40, result["case_count"])
+        self.assertEqual(24, result["splits"]["development"]["case_count"])
         self.assertEqual(16, result["splits"]["evaluation"]["case_count"])
         self.assertEqual(1.0, result["metrics"]["macro_f1_positive_support"])
         self.assertEqual(0, result["metrics"]["false_required_activation_count"])
@@ -84,10 +84,10 @@ class V03BenchmarkTests(unittest.TestCase):
     def test_mutation_suite_kills_every_published_checker_shape(self):
         result = BENCHMARK.run_mutations()
         self.assertEqual("pass", result["status"])
-        self.assertEqual(8, result["eligible_mutations"])
-        self.assertEqual(8, result["killed_mutations"])
+        self.assertEqual(10, result["eligible_mutations"])
+        self.assertEqual(10, result["killed_mutations"])
         self.assertEqual(1.0, result["mutation_kill_rate"])
-        self.assertEqual(8, len(result["by_checker"]))
+        self.assertEqual(10, len(result["by_checker"]))
 
     def test_mutation_claim_is_scoped_to_published_checkers(self):
         manifest = json.loads(

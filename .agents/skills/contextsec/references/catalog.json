@@ -1,5 +1,5 @@
 {
-  "schema_version": "0.2.1",
+  "schema_version": "0.3.0",
   "capabilities": [
     "ai.autonomous_action",
     "ai.memory",

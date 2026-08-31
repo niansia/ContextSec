@@ -33,7 +33,7 @@ Each mutation pair contains the minimum production files needed to activate one 
 3. the finding has the expected `failed` or `unknown` state; and
 4. the finding binds the expected catalog control IDs.
 
-The eight v0.3 mutations cover tenant predicates, broad PII logging, whole-object AI egress, public upload ACLs, tenant-derived object keys, webhook idempotency evidence, immutable Action references, and explicit workflow permissions. A 100% score means 8/8 supported shapes changed as expected. It does not mean 116/116 controls have checkers.
+The ten v0.3 mutations cover tenant predicates, tenant raw-query abstention, broad PII logging, whole-object AI egress, client-public secret namespaces, public upload ACLs, tenant-derived object keys, webhook idempotency evidence, immutable Action references, and explicit workflow permissions. A 100% score means 10/10 supported shapes changed as expected. It does not mean 116/116 controls have checkers.
 
 ## Leakage and provenance
 

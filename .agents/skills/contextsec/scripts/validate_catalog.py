@@ -13,7 +13,7 @@ from typing import Any, List, Mapping, Optional, Sequence
 SKILL_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CATALOG = SKILL_ROOT / "references" / "catalog.json"
 DEFAULT_COMPOSITIONS = SKILL_ROOT / "references" / "compositions" / "catalog.json"
-VERSION = "0.2.1"
+VERSION = "0.3.0"
 SEVERITIES = {"critical", "high", "medium", "low", "info"}
 PACK_ID = re.compile(r"^[a-z][a-z0-9-]+$")
 CONTROL_ID = re.compile(r"^[A-Z]+(?:-[A-Z]+)+-[0-9]{3}$")

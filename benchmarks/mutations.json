@@ -1,6 +1,6 @@
 {
   "version": "0.3.0",
-  "method": "Each pair differs by one security-relevant edit. A mutation is killed only when the target finding is absent in the baseline, appears exactly once in the mutant with the expected status, and binds the expected control. This measures the eight published deterministic checker shapes, not all 116 catalog controls and not application test quality.",
+  "method": "Each pair differs by one security-relevant edit. A mutation is killed only when the target finding is absent in the baseline, appears exactly once in the mutant with the expected status, and binds the expected control. This measures the ten published deterministic checker shapes, not all 116 catalog controls and not application test quality.",
   "thresholds": {"minimum_kill_rate": 1.0},
   "mutations": [
     {
@@ -15,6 +15,34 @@
       "mutant_files": {
         "prisma/schema.prisma": "model Invoice {\n id String @id\n tenantId String\n}\n",
         "app/api/invoices/route.ts": "export async function GET(req: NextRequest) { return prisma.invoice.findUnique({ where: { id } }); }\n"
+      }
+    },
+    {
+      "id": "replace-scoped-query-with-raw-query",
+      "checker_id": "TENANT-RAW-QUERY-001",
+      "expected_mutant_status": "unknown",
+      "expected_control_ids": ["TEN-DB-001", "API-OBJ-001"],
+      "baseline_files": {
+        "prisma/schema.prisma": "model Invoice {\n id String @id\n tenantId String\n}\n",
+        "app/api/invoices/route.ts": "export async function GET(req: NextRequest) { return prisma.invoice.findUnique({ where: { id, tenantId } }); }\n"
+      },
+      "mutant_files": {
+        "prisma/schema.prisma": "model Invoice {\n id String @id\n tenantId String\n}\n",
+        "app/api/invoices/route.ts": "export async function GET(req: NextRequest) { return prisma.$queryRawUnsafe(query); }\n"
+      }
+    },
+    {
+      "id": "move-secret-into-client-public-namespace",
+      "checker_id": "CLIENT-PUBLIC-SECRET-001",
+      "expected_mutant_status": "failed",
+      "expected_control_ids": ["FND-SECRET-001"],
+      "baseline_files": {
+        "package.json": "{\"dependencies\":{\"next\":\"15\"}}\n",
+        ".env.example": "STRIPE_SECRET_KEY=REDACTED\n"
+      },
+      "mutant_files": {
+        "package.json": "{\"dependencies\":{\"next\":\"15\"}}\n",
+        ".env.example": "NEXT_PUBLIC_STRIPE_SECRET_KEY=REDACTED\n"
       }
     },
     {

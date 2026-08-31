@@ -52,7 +52,7 @@ def validate(profile: Mapping[str, Any]) -> List[str]:
         errors,
     )
     require(
-        profile.get("schema_version") == "0.2.1", "unsupported schema_version", errors
+        profile.get("schema_version") == "0.3.0", "unsupported schema_version", errors
     )
 
     subject = profile.get("subject")
@@ -103,13 +103,19 @@ def validate(profile: Mapping[str, Any]) -> List[str]:
     if isinstance(coverage, dict):
         exact_keys(
             coverage,
-            {"status", "entries_seen", "production_files_considered", "skip_counts", "limits"},
+            {"status", "language_support", "entries_seen", "production_files_considered", "skip_counts", "limits"},
             "coverage",
             errors,
         )
         require(
             coverage.get("status") in {"complete", "partial"},
             "coverage.status must be complete or partial",
+            errors,
+        )
+        require(
+            coverage.get("language_support")
+            in {"supported", "partial", "unsupported"},
+            "coverage.language_support is invalid",
             errors,
         )
 

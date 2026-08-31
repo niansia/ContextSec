@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://contextsec.dev/schemas/security-profile-0.2.1.json",
+  "$id": "https://contextsec.dev/schemas/security-profile-0.3.0.json",
   "title": "ContextSec Security Profile",
   "$defs": {
     "pack": {
@@ -22,7 +22,7 @@
     "limitations"
   ],
   "properties": {
-    "schema_version": {"const": "0.2.1"},
+    "schema_version": {"const": "0.3.0"},
     "subject": {
       "type": "object",
       "required": ["repository", "subject_revision", "source_inventory_digest", "decision_model_digest", "files_scanned", "files_skipped", "bytes_scanned"],
@@ -39,9 +39,10 @@
     },
     "coverage": {
       "type": "object",
-      "required": ["status", "entries_seen", "production_files_considered", "skip_counts", "limits"],
+      "required": ["status", "language_support", "entries_seen", "production_files_considered", "skip_counts", "limits"],
       "properties": {
         "status": {"enum": ["complete", "partial"]},
+        "language_support": {"enum": ["supported", "partial", "unsupported"]},
         "entries_seen": {"type": "integer", "minimum": 0},
         "production_files_considered": {"type": "integer", "minimum": 0},
         "skip_counts": {

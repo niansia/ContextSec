@@ -1,14 +1,14 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://contextsec.dev/schemas/control-checks-0.2.1.json",
+  "$id": "https://contextsec.dev/schemas/control-checks-0.3.0.json",
   "title": "ContextSec deterministic control checks",
   "type": "object",
   "required": ["schema_version", "subject", "active_packs", "findings", "finding_summary", "limitations"],
   "properties": {
-    "schema_version": {"const": "0.2.1"},
+    "schema_version": {"const": "0.3.0"},
     "subject": {
       "type": "object",
-      "required": ["repository", "subject_revision", "source_inventory_digest", "decision_model_digest", "checker_version", "profile_coverage", "checker_coverage", "checker_input_hash"],
+      "required": ["repository", "subject_revision", "source_inventory_digest", "decision_model_digest", "checker_version", "profile_coverage", "profile_language_support", "checker_coverage", "checker_input_hash"],
       "properties": {
         "repository": {"type": "string", "minLength": 1},
         "subject_revision": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
@@ -16,12 +16,13 @@
         "decision_model_digest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
         "checker_version": {"type": "string", "minLength": 1},
         "profile_coverage": {"enum": ["complete", "partial"]},
+        "profile_language_support": {"enum": ["supported", "partial", "unsupported"]},
         "checker_coverage": {
           "type": "object",
           "required": ["traversal", "language_support", "checker_support", "match_enumeration"],
           "properties": {
             "traversal": {"enum": ["complete", "partial"]},
-            "language_support": {"enum": ["complete", "partial"]},
+            "language_support": {"enum": ["supported", "partial", "unsupported"]},
             "checker_support": {"enum": ["complete", "partial"]},
             "match_enumeration": {"enum": ["complete", "mixed_first_only", "first_only"]}
           },

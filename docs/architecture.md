@@ -54,7 +54,7 @@ Each observation contains:
 - repository-relative path and locator;
 - a stable `location_id`, whole-file `content_digest`, content-bound `fingerprint`, and profile `subject_revision`.
 
-The stable IDs support comparison; the digest/fingerprint detect source change. Hashes are integrity identifiers, not secrecy. The artifact does not contain matched text, secret values, full PII, environment contents, or absolute local paths.
+The stable IDs support comparison; the digest/fingerprint detect source change. Hashes are integrity identifiers, not secrecy. The artifact does not contain matched text, secret values, full PII, environment contents, or absolute local paths. `.env`-family files are reduced to key names before content hashing or observation generation; values never become evidence material.
 
 ## Claim semantics
 
@@ -82,7 +82,7 @@ When every pack in a composition is active, the derived control is emitted as a 
 
 Each active-pack control and active composition becomes exactly one ledger row. `applicability` (`required`, `candidate`, `not_applicable`, `unknown`) and `verification` (`verified`, `failed`, `unknown`, `waived`) are independent dimensions. Catalog `applies_when` rules use detected sub-capabilities to avoid irrelevant blockers. Findings force applicability to `required`; a `failed` deterministic finding cannot be overridden by a supplied `verified` assertion. `verified` and `failed` require evidence references. Waivers require owner, reason, compensating control, expiry, and an explicit deterministic `as-of` date. The ledger records that date, while validation of any waiver-bearing artifact requires the intended release date as an external input to prevent replay.
 
-The profiler runs once per repository evaluation. Its `subject_revision`, repository label, decision-model digest, coverage, and active packs must match the checker artifact before the ledger accepts it. The artifact decision-model digest must also equal the live catalog digest; finding IDs, location IDs, evidence IDs, and fingerprints are recomputed for internal consistency.
+The profiler runs once per repository evaluation. Its `subject_revision`, repository label, decision-model digest, traversal coverage, stack support, and active packs must match the checker artifact before the ledger accepts it. The artifact decision-model digest must also equal the live catalog digest; finding IDs, location IDs, evidence IDs, and fingerprints are recomputed for internal consistency.
 
 ## Deterministic-core invariants
 
@@ -95,7 +95,7 @@ The profiler runs once per repository evaluation. Its `subject_revision`, reposi
 - Documentation, tests, fixtures, examples, dependencies, and generated output do not drive production claims.
 - Stable ordering and no implicit timestamps, so the same byte-identical scope and explicit inputs yield the same profile or ledger.
 - Errors and limits become explicit limitations or non-zero process exits, never a pass.
-- Coverage is explicit: unreadable, invalid, binary, or bounded-out production input makes the profile `partial`, which cannot support a release pass.
+- Coverage has separate dimensions: unreadable, invalid, binary, or bounded-out production input makes traversal `partial`; the detected stack is independently `supported`, `partial`, or `unsupported`. Any non-supported dimension prevents a release pass.
 
 ## Why packs are not the moat
 

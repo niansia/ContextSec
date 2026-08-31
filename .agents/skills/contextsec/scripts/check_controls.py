@@ -21,6 +21,34 @@ import profile_repo  # noqa: E402
 
 CHECKER_VERSION = "0.3.0"
 
+CHECKER_SUPPORTED_SUFFIXES = {
+    ".cjs",
+    ".js",
+    ".jsx",
+    ".mjs",
+    ".prisma",
+    ".ts",
+    ".tsx",
+    ".vue",
+}
+CHECKER_UNSUPPORTED_SUFFIXES = profile_repo.PROFILE_UNSUPPORTED_SUFFIXES | {".py"}
+
+
+def checker_stack_family(relative: Path) -> str:
+    if relative.name == "package.json" or profile_repo.is_environment_file(relative):
+        return "supported"
+    suffix = relative.suffix.lower()
+    normalized = relative.as_posix().lower()
+    if suffix in {".yaml", ".yml"} and normalized.startswith(".github/workflows/"):
+        return "supported"
+    if suffix in CHECKER_SUPPORTED_SUFFIXES:
+        return "supported"
+    if relative.name in profile_repo.PROFILE_UNSUPPORTED_MANIFESTS:
+        return "unsupported"
+    if suffix in CHECKER_UNSUPPORTED_SUFFIXES:
+        return "unsupported"
+    return "neutral"
+
 
 def digest(material: bytes) -> str:
     return "sha256:" + hashlib.sha256(material).hexdigest()
@@ -91,6 +119,8 @@ def load_sources(
     bytes_scanned = 0
     files_considered = 0
     partial = False
+    supported_stack_seen = False
+    unsupported_stack_seen = False
     scope_material = [
         "checker=" + CHECKER_VERSION,
         "limits="
@@ -116,6 +146,9 @@ def load_sources(
             break
         files_considered += 1
         relative = relative_path.as_posix()
+        stack_family = checker_stack_family(relative_path)
+        supported_stack_seen = supported_stack_seen or stack_family == "supported"
+        unsupported_stack_seen = unsupported_stack_seen or stack_family == "unsupported"
         try:
             size = path.stat().st_size
         except OSError:
@@ -155,9 +188,21 @@ def load_sources(
                 relative + "\x1fbinary=" + hashlib.sha256(raw).hexdigest()
             )
             continue
-        sources.append((relative, text, raw))
+        evidence_text = (
+            profile_repo.sanitize_environment_text(text)
+            if profile_repo.is_environment_file(path)
+            else text
+        )
+        evidence_raw = (
+            evidence_text.encode("utf-8")
+            if profile_repo.is_environment_file(path)
+            else raw
+        )
+        sources.append((relative, evidence_text, evidence_raw))
         bytes_scanned += len(raw)
-        scope_material.append(relative + "\x1f" + hashlib.sha256(raw).hexdigest())
+        scope_material.append(
+            relative + "\x1f" + hashlib.sha256(evidence_raw).hexdigest()
+        )
     if stats.entry_limit_reached:
         partial = True
     checker_hash = (
@@ -166,6 +211,13 @@ def load_sources(
     )
     coverage = {
         "status": "partial" if partial else "complete",
+        "language_support": (
+            "partial"
+            if supported_stack_seen and unsupported_stack_seen
+            else "supported"
+            if supported_stack_seen
+            else "unsupported"
+        ),
         "entries_seen": stats.entries_seen,
         "production_files_considered": files_considered,
         "files_loaded": len(sources),
@@ -197,13 +249,13 @@ def check_tenant_queries(
     if not {"multi-tenant", "api-inbound"} <= set(active):
         return []
     tenant_models = prisma_models_with_fields(
-        sources, r"\b(tenantId|organizationId|workspaceId)\b"
+        sources, rf"\b(?:{profile_repo.TENANT_PREDICATE_PATTERN})\b"
     )
     if not tenant_models:
         return []
     results = []
     pattern = re.compile(
-        r"prisma\.(?P<model>\w+)\.find(?:Unique|First)\s*\(\s*\{\s*where\s*:\s*\{(?P<where>.{0,500}?)\}\s*\}\s*\)",
+        r"prisma\.(?P<model>\w+)\.(?P<operation>findUnique|findFirst|findMany|update|updateMany|delete|deleteMany|upsert)\s*\(\s*\{(?P<body>.{0,3000}?)\}\s*\)",
         re.IGNORECASE | re.DOTALL,
     )
     for relative, text, raw in sources:
@@ -213,8 +265,18 @@ def check_tenant_queries(
         for match in pattern.finditer(code):
             if match.group("model").lower() not in tenant_models:
                 continue
-            where = match.group("where")
-            if not re.search(r"\b(tenantId|organizationId|workspaceId)\b", where):
+            body = match.group("body")
+            where_match = re.search(
+                r"\bwhere\s*:\s*\{(?P<where>.{0,1200}?)\}",
+                body,
+                re.IGNORECASE | re.DOTALL,
+            )
+            where = where_match.group("where") if where_match else ""
+            if not re.search(
+                rf"\b(?:{profile_repo.TENANT_PREDICATE_PATTERN})\b",
+                where,
+                re.IGNORECASE,
+            ):
                 results.append(
                     finding(
                         "TENANT-QUERY-001",
@@ -232,10 +294,42 @@ def check_tenant_queries(
                         location(
                             relative, text, match.start(), "TENANT-QUERY-001", raw
                         ),
-                        "Supported inline Prisma findUnique/findFirst query contained no tenant, organization, or workspace key.",
+                        "Supported inline Prisma "
+                        + match.group("operation")
+                        + " operation contained no recognized tenant predicate.",
                     )
                 )
-                break
+    return results
+
+
+def check_tenant_raw_queries(
+    sources: Sequence[Tuple[str, str, bytes]], active: Sequence[str]
+) -> List[Dict[str, Any]]:
+    if not {"multi-tenant", "api-inbound"} <= set(active):
+        return []
+    results: List[Dict[str, Any]] = []
+    pattern = re.compile(
+        r"\bprisma\.\$(?:queryRaw|queryRawUnsafe|executeRaw|executeRawUnsafe)\b",
+        re.IGNORECASE,
+    )
+    for relative, text, raw in sources:
+        code = profile_repo.mask_comments_and_strings(
+            text, language=profile_repo.language_for_path(relative)
+        )
+        for match in pattern.finditer(code):
+            results.append(
+                finding(
+                    "TENANT-RAW-QUERY-001",
+                    ("TEN-DB-001", "API-OBJ-001"),
+                    "unknown",
+                    "high",
+                    "Raw Prisma query requires explicit tenant-scope verification",
+                    "A raw query can bypass ORM-level tenant predicates and cross the tenant boundary.",
+                    "Inbound request -> raw SQL execution -> tenant-owned rows without a mechanically verified scope.",
+                    location(relative, text, match.start(), "TENANT-RAW-QUERY-001", raw),
+                    "ContextSec found a supported Prisma raw-query call but does not parse SQL deeply enough to verify its tenant predicate.",
+                )
+            )
     return results
 
 
@@ -521,7 +615,7 @@ def _js_static_expression(text: str, start: int, end: int) -> Optional[str]:
 
 def _tenant_identity_use(expression: str) -> Optional[int]:
     tenant_name = re.compile(
-        r"\b(?:tenantId|organizationId|workspaceId|accountId)\b",
+        rf"\b(?:{profile_repo.TENANT_PREDICATE_PATTERN})\b",
         re.IGNORECASE,
     )
     executable = profile_repo.mask_comments_and_strings(
@@ -554,6 +648,48 @@ def _tenant_identity_use(expression: str) -> Optional[int]:
         ):
             return value_start
     return None
+
+
+def check_client_public_secrets(
+    sources: Sequence[Tuple[str, str, bytes]], active: Sequence[str]
+) -> List[Dict[str, Any]]:
+    del active
+    code_pattern = re.compile(
+        r"\b(?:process\.env\.(?:NEXT_PUBLIC_|REACT_APP_)|import\.meta\.env\.VITE_)"
+        r"[A-Z0-9_]*(?:SECRET|PASSWORD|PRIVATE_KEY|ACCESS_TOKEN|REFRESH_TOKEN|"
+        r"SERVICE_ROLE|SIGNING_KEY|WEBHOOK_SECRET)[A-Z0-9_]*\b",
+        re.IGNORECASE,
+    )
+    env_pattern = re.compile(
+        r"(?m)^\s*(?:export\s+)?(?:NEXT_PUBLIC_|VITE_|REACT_APP_)"
+        r"[A-Z0-9_]*(?:SECRET|PASSWORD|PRIVATE_KEY|ACCESS_TOKEN|REFRESH_TOKEN|"
+        r"SERVICE_ROLE|SIGNING_KEY|WEBHOOK_SECRET)[A-Z0-9_]*\s*=",
+        re.IGNORECASE,
+    )
+    results: List[Dict[str, Any]] = []
+    for relative, text, raw in sources:
+        if profile_repo.is_environment_file(Path(relative)):
+            matches = env_pattern.finditer(text)
+        else:
+            executable = profile_repo.mask_comments_and_strings(
+                text, language=profile_repo.language_for_path(relative)
+            )
+            matches = code_pattern.finditer(executable)
+        for match in matches:
+            results.append(
+                finding(
+                    "CLIENT-PUBLIC-SECRET-001",
+                    ("FND-SECRET-001",),
+                    "failed",
+                    "critical",
+                    "Secret-bearing environment name is exposed to client code",
+                    "A build-time public namespace can embed the corresponding credential in browser-delivered assets.",
+                    "Server credential -> public framework environment namespace -> client bundle or browser runtime.",
+                    location(relative, text, match.start(), "CLIENT-PUBLIC-SECRET-001", raw),
+                    "The key name, not its value, matched a supported Next.js, Vite, or Create React App public namespace and an unambiguously secret-bearing token.",
+                )
+            )
+    return results
 
 
 def check_public_upload(
@@ -772,8 +908,10 @@ def check_repository(
     findings: List[Dict[str, Any]] = []
     for checker in (
         check_tenant_queries,
+        check_tenant_raw_queries,
         check_pii_logging,
         check_ai_egress,
+        check_client_public_secrets,
         check_public_upload,
         check_upload_tenant_binding,
         check_payment_idempotency,
@@ -789,7 +927,7 @@ def check_repository(
     limitations = [
         "These are narrow deterministic checks, not a general vulnerability scan.",
         "A missing lexical pattern is never treated as verified control evidence.",
-        "Only the documented Node.js, Next.js, Prisma, S3, Stripe, OpenAI, and GitHub Actions shapes are supported in v0.3.",
+        "Only the documented Node.js, Next.js, Prisma, S3, Stripe, OpenAI, GitHub Actions, and public environment-name shapes are supported in v0.3.",
         "Traversal coverage, language support, checker support, and match enumeration are reported separately; most v0.3 checkers enumerate only their first supported finding per file or repository.",
         "PII flow checks abstain on Prisma select/omit projections rather than assuming the returned shape is sensitive.",
     ]
@@ -802,7 +940,7 @@ def check_repository(
             "The checker input traversal is partial; deterministic findings are incomplete."
         )
     return {
-        "schema_version": "0.2.1",
+        "schema_version": profile_repo.SCHEMA_VERSION,
         "subject": {
             "repository": profile["subject"]["repository"],
             "subject_revision": profile["subject"]["subject_revision"],
@@ -810,9 +948,10 @@ def check_repository(
             "source_inventory_digest": checker_coverage["source_inventory_digest"],
             "checker_version": CHECKER_VERSION,
             "profile_coverage": profile["coverage"]["status"],
+            "profile_language_support": profile["coverage"]["language_support"],
             "checker_coverage": {
                 "traversal": checker_coverage["status"],
-                "language_support": "partial",
+                "language_support": checker_coverage["language_support"],
                 "checker_support": "partial",
                 "match_enumeration": "mixed_first_only"
             },

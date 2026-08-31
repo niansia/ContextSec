@@ -2,8 +2,15 @@
 
 ## 0.3.0 — Benchmark and mutation proof
 
-- Added a 36-case fully labeled profile corpus with separate development and frozen maintainer-authored evaluation splits, per-pack confusion counts, macro/micro F1, safety-critical recall, capability annotations, and false-required activation counts.
-- Added eight baseline/mutant pairs covering every published deterministic checker shape; all mutations must change the expected finding state and control binding.
+- Added a 40-case fully labeled profile corpus with 24 development and 16 frozen maintainer-authored evaluation cases, per-pack confusion counts, macro/micro F1, safety-critical recall, capability annotations, and false-required activation counts.
+- Added ten baseline/mutant pairs covering every published deterministic checker shape; all mutations must change the expected finding state and control binding.
+- Added a mandatory positive/negative contract for every text and dependency detector so boundary and false-positive behavior is regression tested.
+- Fixed no-argument `auth()` recognition, added Clerk/Auth0/WorkOS/Better Auth/Lucia dependency evidence, and expanded conservative tenant-key aliases including `orgId`, `org_id`, `accountId`, `teamId`, and `companyId`.
+- Added key-name-only `.env` profiling and a blocking checker for secret-bearing `NEXT_PUBLIC_`, `VITE_`, and `REACT_APP_` variables without serializing or hashing secret values.
+- Expanded tenant checks across supported Prisma CRUD calls, enumerate every supported match, and emit an explicit `unknown` finding for raw SQL that needs semantic review.
+- Added machine-readable supported/partial/unsupported stack coverage and bound it across Profile, Checks, Ledger, and gate evaluation; this intentionally advances artifact schemas from `0.2.1` to `0.3.0`.
+- Added mainstream Node ecosystem evidence for authentication, ORM, queue, observability, Supabase, and Taiwan payment integrations while keeping technology-only dependencies from activating risk packs on their own.
+- Excluded non-workflow `.github` governance files from production evidence so issue forms and dependency configuration cannot pollute self-profiling.
 - Added four manually reviewed public-repository cases pinned to immutable commits with license/provenance metadata and a local-checkout runner that verifies `HEAD` without cloning or executing target code.
 - Added conservative Python production-manifest evidence for PEP 621, Poetry, requirements, and Pipfile while excluding optional/dev and test/example manifests.
 - Added Python FastAPI/Django/Flask, PII model, tenant model, and authentication evidence; promoted supported generic HTTP routes to direct high-confidence API evidence.
@@ -11,6 +18,7 @@
 - Added path-safe temporary benchmark materialization, explicit metric claim boundaries, and separate benchmark methodology/real-repository documentation.
 - Expanded CI to Ubuntu, macOS, and Windows across Python 3.11–3.14, smoke-tested the documented public CLI on every combination, retained dogfood and reproducible archive checks, and pinned the official Agent Skills reference validator to a full commit.
 - Added an editable, dependency-free SVG decision flow and copyable Windows, macOS, and Linux quick-start instructions.
+- Unified the documented agent path around `contextsec.py`, declared Python 3.11+ and three-OS compatibility, and added schema validation subcommands to the public dispatcher.
 
 ## 0.2.1 — Applicability correctness and integrity hardening
 

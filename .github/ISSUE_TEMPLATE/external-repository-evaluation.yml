@@ -1,0 +1,43 @@
+name: External repository evaluation
+description: Propose an independently reviewed, commit-pinned repository case for the benchmark.
+title: "[benchmark] "
+labels: [benchmark, external-review]
+body:
+  - type: input
+    id: repository
+    attributes:
+      label: Public repository URL
+    validations:
+      required: true
+  - type: input
+    id: commit
+    attributes:
+      label: Full immutable commit SHA
+    validations:
+      required: true
+  - type: input
+    id: license
+    attributes:
+      label: License and source of license evidence
+    validations:
+      required: true
+  - type: textarea
+    id: sampling
+    attributes:
+      label: Why this repository belongs in the sampling frame
+    validations:
+      required: true
+  - type: textarea
+    id: labels
+    attributes:
+      label: Independent annotations
+      description: List required and candidate packs, coverage limitations, reviewer identity or method, and any disagreement. Do not run or paste target code.
+    validations:
+      required: true
+  - type: checkboxes
+    id: authorization
+    attributes:
+      label: Review boundary
+      options:
+        - label: The repository is public and the proposed evaluation only profiles bounded text without executing target code.
+          required: true

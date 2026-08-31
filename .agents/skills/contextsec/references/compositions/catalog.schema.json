@@ -1,11 +1,11 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://contextsec.dev/schemas/compositions-0.2.1.json",
+  "$id": "https://contextsec.dev/schemas/compositions-0.3.0.json",
   "title": "ContextSec composition catalog",
   "type": "object",
   "required": ["schema_version", "rules"],
   "properties": {
-    "schema_version": {"const": "0.2.1"},
+    "schema_version": {"const": "0.3.0"},
     "rules": {
       "type": "array",
       "items": {

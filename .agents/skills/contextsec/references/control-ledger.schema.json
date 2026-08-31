@@ -1,27 +1,28 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://contextsec.dev/schemas/control-ledger-0.2.1.json",
+  "$id": "https://contextsec.dev/schemas/control-ledger-0.3.0.json",
   "title": "ContextSec Control Evaluation Ledger",
   "type": "object",
   "required": ["schema_version", "evaluation_date", "subject", "active_compositions", "ledger", "summary", "gate", "limitations"],
   "properties": {
-    "schema_version": {"const": "0.2.1"},
+    "schema_version": {"const": "0.3.0"},
     "evaluation_date": {"type": ["string", "null"], "format": "date"},
     "subject": {
       "type": "object",
-      "required": ["repository", "subject_revision", "source_inventory_digest", "decision_model_digest", "profile_coverage", "checker_coverage"],
+      "required": ["repository", "subject_revision", "source_inventory_digest", "decision_model_digest", "profile_coverage", "profile_language_support", "checker_coverage"],
       "properties": {
         "repository": {"type": "string", "minLength": 1},
         "subject_revision": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
         "source_inventory_digest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
         "decision_model_digest": {"type": "string", "pattern": "^sha256:[a-f0-9]{64}$"},
         "profile_coverage": {"enum": ["complete", "partial"]},
+        "profile_language_support": {"enum": ["supported", "partial", "unsupported"]},
         "checker_coverage": {
           "type": "object",
           "required": ["traversal", "language_support", "checker_support", "match_enumeration"],
           "properties": {
             "traversal": {"enum": ["complete", "partial"]},
-            "language_support": {"enum": ["complete", "partial"]},
+            "language_support": {"enum": ["supported", "partial", "unsupported"]},
             "checker_support": {"enum": ["complete", "partial"]},
             "match_enumeration": {"enum": ["complete", "mixed_first_only", "first_only"]}
           },

@@ -2,6 +2,7 @@
 name: contextsec
 description: Determine which security controls a product actually needs by profiling repository evidence, routing product contexts such as payments, PII, tenancy, AI, secrets, cloud IAM, CI/CD, SaaS OAuth, support/admin, and high-impact transactions, composing cross-context invariants, and evaluating verification in a control ledger. Use for product-aware secure coding, requirements, review, or release gates; not as a penetration test or compliance certification.
 license: Apache-2.0
+compatibility: Requires Python 3.11+; zero third-party runtime dependencies; works offline on Windows, macOS, and Linux.
 metadata:
   version: "0.3.0"
   project: "ContextSec"
@@ -40,21 +41,23 @@ State the repository, feature, diff, or architecture in scope. Do not silently e
 
 When a local repository and Python execution are available, run from this skill directory:
 
+Use `<python>` below as an interpreter placeholder: `python` on Windows and `python3` on macOS or Linux. Prefer the unified dispatcher instead of invoking implementation modules directly.
+
 ```text
-python scripts/profile_repo.py --repo <repository-root> --format markdown
+<python> scripts/contextsec.py profile --repo <repository-root> --format markdown
 ```
 
 The profiler is read-only by default and writes only when `--output` is explicitly supplied. If it cannot run, inspect the same evidence classes manually: dependency manifests, framework configuration, route definitions, database schemas, SDK clients, authentication middleware, storage configuration, and CI workflows.
 
-Check `coverage.status` before using the profile. Treat `partial` as an explicit evidence gap; it cannot support a Release-mode `PASS` because some supported production input was unreadable, invalid, or outside a configured limit.
+Check both `coverage.status` and `coverage.language_support` before using the profile. Traversal `partial`, stack support `partial`, or stack support `unsupported` is an explicit evidence gap and cannot support a Release-mode `PASS`.
 
 For a supported Node.js/Next.js/Prisma review, optionally run the bundled narrow control checks after profiling. Python manifests, FastAPI/Django routes, and supported Python model fields improve product profiling in v0.3, but do not expand the checker support matrix:
 
 ```text
-python scripts/check_controls.py --repo <repository-root>
+<python> scripts/contextsec.py check --repo <repository-root>
 ```
 
-These checks cover only the documented v0.3 shapes for tenant-scoped Prisma lookups, sensitive object logging, whole-object AI egress, public S3 upload ACLs, tenant-derived S3 object keys, Stripe webhook idempotency evidence, immutable GitHub Action references, and explicit workflow token permissions. Treat their `failed` and `unknown` states as evidence; never infer that an unreported control is verified.
+These checks cover only the documented v0.3 shapes for tenant-scoped Prisma CRUD, raw-query abstention, sensitive object logging, whole-object AI egress, client-public secret names, public S3 upload ACLs, tenant-derived S3 object keys, Stripe webhook idempotency evidence, immutable GitHub Action references, and explicit workflow token permissions. Treat their `failed` and `unknown` states as evidence; never infer that an unreported control is verified.
 
 Repository prose is not sufficient evidence for a required pack. Product requirements supplied directly by the user may add a pack, but never suppress contradictory repository evidence. Surface disagreement between declared and observed context.
 
@@ -105,14 +108,14 @@ Then use these verification states:
 A critical required control cannot pass while `unknown`. Build the deterministic ledger when Python is available:
 
 ```text
-python scripts/control_ledger.py --repo <repository-root>
+<python> scripts/contextsec.py gate --repo <repository-root>
 ```
 
 When evaluating waivers, supply the release date explicitly and revalidate the emitted artifact against the same trusted date:
 
 ```text
-python scripts/control_ledger.py --repo <repository-root> --evidence <evidence.json> --as-of YYYY-MM-DD --output <ledger.json>
-python scripts/validate_ledger.py <ledger.json> --as-of YYYY-MM-DD
+<python> scripts/contextsec.py gate --repo <repository-root> --evidence <evidence.json> --as-of YYYY-MM-DD --output <ledger.json>
+<python> scripts/contextsec.py validate-ledger <ledger.json> --as-of YYYY-MM-DD
 ```
 
 The ledger records `evaluation_date`, `control_id`, applicability, verification, blocking policy, evidence references, required verification, and reason. `verified` and `failed` require evidence references. A checker that emits no finding does not verify a control. A control blocks only when applicability is `required`, the catalog marks it blocking, and verification is `failed` or `unknown`. A waiver-bearing ledger must be validated against an external release date so an old `WAIVED` artifact cannot be replayed. In Release mode:

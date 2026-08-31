@@ -182,6 +182,40 @@
       "expected_candidate_packs": []
     },
     {
+      "id": "clerk-drizzle-org-alias",
+      "split": "development",
+      "safety_critical_packs": ["auth-session"],
+      "files": {
+        "package.json": "{\"dependencies\":{\"next\":\"15.0.0\",\"@clerk/nextjs\":\"6.0.0\",\"drizzle-orm\":\"0.44.0\"}}\n",
+        "app/api/records/route.ts": "export async function GET() { const { orgId } = await auth(); return db.query.records.findMany({ where: eq(records.orgId, orgId) }); }\n"
+      },
+      "expected_required_packs": ["foundation", "baseline-web", "auth-session", "api-inbound"],
+      "expected_candidate_packs": ["multi-tenant"]
+    },
+    {
+      "id": "account-id-analytics-negative",
+      "split": "development",
+      "files": {"src/metrics.ts": "const accountId = analytics.accountId; recordMetric(accountId);\n"},
+      "expected_required_packs": ["foundation"],
+      "expected_candidate_packs": []
+    },
+    {
+      "id": "tappay-provider-endpoint",
+      "split": "development",
+      "safety_critical_packs": ["payments"],
+      "files": {"src/payment.ts": "const response = await fetch('https://sandbox.tappaysdk.com/tpc/payment/pay-by-prime', { method: 'POST' });\n"},
+      "expected_required_packs": ["foundation", "payments", "external-api"],
+      "expected_candidate_packs": []
+    },
+    {
+      "id": "client-public-secret-name",
+      "split": "development",
+      "files": {".env.local": "NEXT_PUBLIC_STRIPE_SECRET_KEY=fixture-value-never-retained\n"},
+      "expected_required_packs": ["foundation"],
+      "expected_candidate_packs": [],
+      "expected_capabilities": {"authority.secrets_used": "present"}
+    },
+    {
       "id": "fastapi-auth-pii-api",
       "split": "evaluation",
       "safety_critical_packs": ["privacy-pii"],

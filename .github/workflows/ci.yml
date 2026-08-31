@@ -52,7 +52,7 @@ jobs:
       - name: Run all offline benchmark suites
         run: python .agents/skills/contextsec/scripts/contextsec.py benchmark --suite all
       - name: Validate decision catalogs
-        run: python .agents/skills/contextsec/scripts/validate_catalog.py
+        run: python .agents/skills/contextsec/scripts/contextsec.py validate-catalog
       - name: Verify clean release allowlist
         run: python .agents/skills/contextsec/scripts/package_release.py --list
       - name: Verify byte-identical release archives
@@ -62,12 +62,12 @@ jobs:
           cmp /tmp/contextsec-first.zip /tmp/contextsec-second.zip
       - name: Dogfood profile, checks, and ledger
         run: |
-          python .agents/skills/contextsec/scripts/profile_repo.py --repo . --output contextsec-profile.json
-          python .agents/skills/contextsec/scripts/validate_profile.py contextsec-profile.json
-          python .agents/skills/contextsec/scripts/check_controls.py --repo . --output contextsec-checks.json
-          python .agents/skills/contextsec/scripts/validate_checks.py contextsec-checks.json
-          python .agents/skills/contextsec/scripts/control_ledger.py --repo examples/next-static --output contextsec-ledger.json
-          python .agents/skills/contextsec/scripts/validate_ledger.py contextsec-ledger.json
+          python .agents/skills/contextsec/scripts/contextsec.py profile --repo . --output contextsec-profile.json
+          python .agents/skills/contextsec/scripts/contextsec.py validate-profile contextsec-profile.json
+          python .agents/skills/contextsec/scripts/contextsec.py check --repo . --output contextsec-checks.json
+          python .agents/skills/contextsec/scripts/contextsec.py validate-checks contextsec-checks.json
+          python .agents/skills/contextsec/scripts/contextsec.py gate --repo examples/next-static --output contextsec-ledger.json
+          python .agents/skills/contextsec/scripts/contextsec.py validate-ledger contextsec-ledger.json
 
   agent-skill-spec:
     runs-on: ubuntu-latest
@@ -135,3 +135,17 @@ jobs:
           python-version: "3.14"
       - name: Profile pinned repositories without executing them
         run: python .agents/skills/contextsec/scripts/contextsec.py benchmark --suite real-repo --workspace real-repos
+
+  required:
+    name: required
+    if: ${{ always() }}
+    needs: [test, evidence, agent-skill-spec, real-repositories]
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Require every CI proof lane
+        run: |
+          test "${{ needs.test.result }}" = "success"
+          test "${{ needs.evidence.result }}" = "success"
+          test "${{ needs.agent-skill-spec.result }}" = "success"
+          test "${{ needs.real-repositories.result }}" = "success"

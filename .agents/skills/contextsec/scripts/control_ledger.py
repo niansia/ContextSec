@@ -22,7 +22,7 @@ import validate_checks  # noqa: E402
 
 REFERENCE_DIR = Path(__file__).resolve().parents[1] / "references"
 COMPOSITION_PATH = REFERENCE_DIR / "compositions" / "catalog.json"
-SCHEMA_VERSION = "0.2.1"
+SCHEMA_VERSION = "0.3.0"
 APPLICABILITY_STATES = {"required", "candidate", "not_applicable", "unknown"}
 VERIFICATION_STATES = {"verified", "failed", "unknown", "waived"}
 
@@ -168,6 +168,11 @@ def validate_subject_binding(
             "profile_coverage",
             profile.get("coverage", {}).get("status"),
             check_subject.get("profile_coverage"),
+        ),
+        (
+            "profile_language_support",
+            profile.get("coverage", {}).get("language_support"),
+            check_subject.get("profile_language_support"),
         ),
     )
     for field, expected, actual in comparisons:
@@ -389,9 +394,11 @@ def build_ledger(
         for item in ledger
         if item["blocking"] and item["verification"] == "waived"
     ]
-    coverage_block = profile["coverage"]["status"] == "partial" or checks[
-        "subject"
-    ]["checker_coverage"]["traversal"] == "partial"
+    coverage_block = (
+        profile["coverage"]["status"] == "partial"
+        or profile["coverage"]["language_support"] != "supported"
+        or checks["subject"]["checker_coverage"]["traversal"] == "partial"
+    )
     unresolved = [
         item
         for item in ledger
@@ -416,6 +423,7 @@ def build_ledger(
             "decision_model_digest": profile["subject"]["decision_model_digest"],
             "source_inventory_digest": profile["subject"]["source_inventory_digest"],
             "profile_coverage": profile["coverage"]["status"],
+            "profile_language_support": profile["coverage"]["language_support"],
             "checker_coverage": checks["subject"]["checker_coverage"],
         },
         "active_compositions": sorted(active_compositions),
@@ -436,7 +444,7 @@ def build_ledger(
         "gate": {
             "status": gate_status,
             "reason": (
-                "Supported input coverage is partial."
+                "Supported input traversal or stack coverage is incomplete."
                 if coverage_block
                 else (
                     "Blocking required controls failed or lack verification."

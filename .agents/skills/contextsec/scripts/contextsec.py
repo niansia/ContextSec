@@ -19,6 +19,10 @@ import benchmark  # noqa: E402
 import check_controls  # noqa: E402
 import control_ledger  # noqa: E402
 import profile_repo  # noqa: E402
+import validate_catalog  # noqa: E402
+import validate_checks  # noqa: E402
+import validate_ledger  # noqa: E402
+import validate_profile  # noqa: E402
 
 
 def explain(identifier: str, root: Optional[Path] = None) -> int:
@@ -90,7 +94,18 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         description="Profile product risk, explain routing, check controls, and evaluate releases.",
     )
     parser.add_argument(
-        "command", choices=("profile", "check", "explain", "gate", "benchmark")
+        "command",
+        choices=(
+            "profile",
+            "check",
+            "explain",
+            "gate",
+            "benchmark",
+            "validate-catalog",
+            "validate-profile",
+            "validate-checks",
+            "validate-ledger",
+        ),
     )
     parser.add_argument("arguments", nargs=argparse.REMAINDER)
     args = parser.parse_args(argv)
@@ -102,6 +117,14 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         return control_ledger.main(args.arguments)
     if args.command == "benchmark":
         return benchmark.main(args.arguments)
+    if args.command == "validate-catalog":
+        return validate_catalog.main(args.arguments)
+    if args.command == "validate-profile":
+        return validate_profile.main(args.arguments)
+    if args.command == "validate-checks":
+        return validate_checks.main(args.arguments)
+    if args.command == "validate-ledger":
+        return validate_ledger.main(args.arguments)
     explain_parser = argparse.ArgumentParser(prog="contextsec explain")
     explain_parser.add_argument("identifier")
     explain_parser.add_argument("--repo", type=Path)

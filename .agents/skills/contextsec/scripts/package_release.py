@@ -13,7 +13,7 @@ from typing import Iterable, Optional, Sequence
 REPOSITORY_ROOT = Path(__file__).resolve().parents[4]
 ALLOWLIST = (
     ".agents/skills/contextsec",
-    ".github/workflows",
+    ".github",
     "benchmarks",
     "docs",
     "examples",

@@ -72,9 +72,9 @@ Delivered scope:
 
 - production dependency evidence for PEP 621, Poetry, requirements, and Pipfile manifests without treating optional/dev dependencies as product facts;
 - high-confidence FastAPI/Django/Flask framework evidence plus supported Python PII and tenant model shapes;
-- 36 fully labeled profile cases split into 20 development and 16 frozen maintainer-authored evaluation cases;
+- 40 fully labeled profile cases split into 24 development and 16 frozen maintainer-authored evaluation cases;
 - required/candidate pack metrics, macro/micro F1, safety-critical recall, capability annotations, and absolute false-required counts;
-- eight single-edit mutation pairs covering every published deterministic checker shape;
+- ten single-edit mutation pairs covering every published deterministic checker shape;
 - four public repositories pinned to immutable commits, license/provenance metadata, and an opt-in local runner that verifies `HEAD`;
 - Windows, macOS, and Linux × Python 3.11–3.14 CI, public CLI smoke tests, dogfood artifacts, deterministic packaging, and the official Agent Skills reference validator pinned to a commit.
 
@@ -83,7 +83,7 @@ Release gate:
 - profile macro F1 >= 0.90 on the authored corpus (currently 1.00);
 - safety-critical trigger recall 100% (currently 100%);
 - false required-pack activation count 0;
-- published-checker mutation kill rate 100% (currently 8/8);
+- published-checker mutation kill rate 100% (currently 10/10);
 - all four pinned real-repository expectations reproduce, while partial coverage remains partial;
 - stale-evidence replay rejection remains covered by the ledger regression suite.
 

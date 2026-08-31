@@ -47,7 +47,7 @@ def validate(payload: Mapping[str, Any]) -> List[str]:
         "checks",
         errors,
     )
-    if payload.get("schema_version") != "0.2.1":
+    if payload.get("schema_version") != "0.3.0":
         errors.append("unsupported schema_version")
     active = payload.get("active_packs")
     if (
@@ -200,12 +200,18 @@ def validate(payload: Mapping[str, Any]) -> List[str]:
     else:
         exact_keys(
             subject,
-            {"repository", "subject_revision", "source_inventory_digest", "decision_model_digest", "checker_version", "profile_coverage", "checker_coverage", "checker_input_hash"},
+            {"repository", "subject_revision", "source_inventory_digest", "decision_model_digest", "checker_version", "profile_coverage", "profile_language_support", "checker_coverage", "checker_input_hash"},
             "subject",
             errors,
         )
         if subject.get("profile_coverage") not in {"complete", "partial"}:
             errors.append("subject.profile_coverage must be complete or partial")
+        if subject.get("profile_language_support") not in {
+            "supported",
+            "partial",
+            "unsupported",
+        }:
+            errors.append("subject.profile_language_support is invalid")
         checker_coverage = subject.get("checker_coverage")
         if not isinstance(checker_coverage, dict):
             errors.append("subject.checker_coverage must be an object")
@@ -216,9 +222,16 @@ def validate(payload: Mapping[str, Any]) -> List[str]:
                 "subject.checker_coverage",
                 errors,
             )
-            for field in ("traversal", "language_support", "checker_support"):
-                if checker_coverage.get(field) not in {"complete", "partial"}:
-                    errors.append("subject.checker_coverage." + field + " is invalid")
+            if checker_coverage.get("traversal") not in {"complete", "partial"}:
+                errors.append("subject.checker_coverage.traversal is invalid")
+            if checker_coverage.get("language_support") not in {
+                "supported",
+                "partial",
+                "unsupported",
+            }:
+                errors.append("subject.checker_coverage.language_support is invalid")
+            if checker_coverage.get("checker_support") not in {"complete", "partial"}:
+                errors.append("subject.checker_coverage.checker_support is invalid")
             if checker_coverage.get("match_enumeration") not in {
                 "complete",
                 "mixed_first_only",

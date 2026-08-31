@@ -1,0 +1,53 @@
+name: Detector or framework contribution
+description: Propose a bounded detector, dependency signal, or framework adapter with adversarial twins.
+title: "[detector] "
+labels: [detector, contribution]
+body:
+  - type: input
+    id: framework
+    attributes:
+      label: Framework, library, or code shape
+    validations:
+      required: true
+  - type: dropdown
+    id: capability
+    attributes:
+      label: Intended effect
+      options:
+        - Route an existing pack
+        - Establish an existing sub-capability
+        - Add checker evidence for an existing control
+        - Mark a stack as supported or partial
+    validations:
+      required: true
+  - type: textarea
+    id: positive
+    attributes:
+      label: Minimal positive example
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: negative
+    attributes:
+      label: Closest negative or adversarial twin
+      description: Show the near-match that must not activate the detector.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Primary documentation or ecosystem evidence
+      description: Link to official documentation that establishes the syntax or dependency.
+    validations:
+      required: true
+  - type: checkboxes
+    id: contract
+    attributes:
+      label: Deterministic contract
+      options:
+        - label: The proposal reuses existing controls rather than duplicating a checklist.
+          required: true
+        - label: The proposal can be evaluated without network access or target-code execution.
+          required: true

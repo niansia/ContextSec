@@ -1,11 +1,11 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://contextsec.dev/schemas/catalog-0.2.1.json",
+  "$id": "https://contextsec.dev/schemas/catalog-0.3.0.json",
   "title": "ContextSec pack and control catalog",
   "type": "object",
   "required": ["schema_version", "capabilities", "packs"],
   "properties": {
-    "schema_version": {"const": "0.2.1"},
+    "schema_version": {"const": "0.3.0"},
     "capabilities": {"$ref": "#/$defs/capabilities"},
     "packs": {
       "type": "array",

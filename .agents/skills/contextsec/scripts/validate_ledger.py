@@ -16,7 +16,7 @@ CATALOG = json.loads((REFERENCE_DIR / "catalog.json").read_text(encoding="utf-8"
 COMPOSITIONS = json.loads(
     (REFERENCE_DIR / "compositions" / "catalog.json").read_text(encoding="utf-8")
 )
-VERSION = "0.2.1"
+VERSION = "0.3.0"
 APPLICABILITY = {"required", "candidate", "not_applicable", "unknown"}
 VERIFICATION = {"verified", "failed", "unknown", "waived"}
 SEVERITY = {"critical", "high", "medium", "low", "info"}
@@ -62,7 +62,7 @@ def validate(payload: Mapping[str, Any], as_of: Optional[date] = None) -> List[s
     else:
         exact(
             subject,
-            {"repository", "subject_revision", "source_inventory_digest", "decision_model_digest", "profile_coverage", "checker_coverage"},
+            {"repository", "subject_revision", "source_inventory_digest", "decision_model_digest", "profile_coverage", "profile_language_support", "checker_coverage"},
             "subject",
         )
         for field in ("subject_revision", "source_inventory_digest", "decision_model_digest"):
@@ -70,6 +70,12 @@ def validate(payload: Mapping[str, Any], as_of: Optional[date] = None) -> List[s
                 errors.append("subject." + field + " is invalid")
         if subject.get("profile_coverage") not in {"complete", "partial"}:
             errors.append("subject.profile_coverage is invalid")
+        if subject.get("profile_language_support") not in {
+            "supported",
+            "partial",
+            "unsupported",
+        }:
+            errors.append("subject.profile_language_support is invalid")
         checker_coverage = subject.get("checker_coverage")
         if not isinstance(checker_coverage, dict):
             errors.append("subject.checker_coverage must be an object")
@@ -81,7 +87,11 @@ def validate(payload: Mapping[str, Any], as_of: Optional[date] = None) -> List[s
             )
             if checker_coverage.get("traversal") not in {"complete", "partial"}:
                 errors.append("subject.checker_coverage.traversal is invalid")
-            if checker_coverage.get("language_support") not in {"complete", "partial"}:
+            if checker_coverage.get("language_support") not in {
+                "supported",
+                "partial",
+                "unsupported",
+            }:
                 errors.append("subject.checker_coverage.language_support is invalid")
             if checker_coverage.get("checker_support") not in {"complete", "partial"}:
                 errors.append("subject.checker_coverage.checker_support is invalid")
@@ -309,6 +319,7 @@ def validate(payload: Mapping[str, Any], as_of: Optional[date] = None) -> List[s
             errors.append("gate reason is invalid")
         coverage_block = isinstance(subject, dict) and (
             subject.get("profile_coverage") == "partial"
+            or subject.get("profile_language_support") != "supported"
             or isinstance(subject.get("checker_coverage"), dict)
             and subject["checker_coverage"].get("traversal") == "partial"
         )

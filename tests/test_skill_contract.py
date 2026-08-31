@@ -52,8 +52,20 @@ class SkillContractTests(unittest.TestCase):
         skill = (SKILL_ROOT / "SKILL.md").read_text(encoding="utf-8")
         self.assertTrue(skill.startswith("---\nname: contextsec\n"))
         self.assertIn("use for", skill.split("---", 2)[1].lower())
+        self.assertIn("compatibility: Requires Python 3.11+", skill)
+        self.assertNotRegex(
+            skill,
+            r"<python> scripts/(?:profile_repo|check_controls|control_ledger|validate_[a-z_]+)\.py",
+        )
         self.assertNotIn("TODO", skill)
         self.assertLess(len(skill.splitlines()), 500)
+
+    def test_public_dispatcher_validates_catalogs(self):
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            status = CONTEXTSEC.main(["validate-catalog"])
+        self.assertEqual(0, status)
+        self.assertIn("semantically valid", output.getvalue())
 
     def test_profile_schema_is_valid_json(self):
         schema = json.loads(
@@ -61,14 +73,14 @@ class SkillContractTests(unittest.TestCase):
                 encoding="utf-8"
             )
         )
-        self.assertEqual("0.2.1", schema["properties"]["schema_version"]["const"])
+        self.assertEqual("0.3.0", schema["properties"]["schema_version"]["const"])
         checks_schema = json.loads(
             (SKILL_ROOT / "references" / "control-checks.schema.json").read_text(
                 encoding="utf-8"
             )
         )
         self.assertEqual(
-            "0.2.1", checks_schema["properties"]["schema_version"]["const"]
+            "0.3.0", checks_schema["properties"]["schema_version"]["const"]
         )
         ledger_schema = json.loads(
             (SKILL_ROOT / "references" / "control-ledger.schema.json").read_text(
@@ -76,7 +88,7 @@ class SkillContractTests(unittest.TestCase):
             )
         )
         self.assertEqual(
-            "0.2.1", ledger_schema["properties"]["schema_version"]["const"]
+            "0.3.0", ledger_schema["properties"]["schema_version"]["const"]
         )
 
     def test_generated_profiles_pass_semantic_validation(self):
@@ -224,7 +236,7 @@ class SkillContractTests(unittest.TestCase):
         checks = CHECKER.check_repository(ROOT / "tests/fixtures/static-site")
         initial = LEDGER.build_ledger(profile, checks)
         evidence = {
-            "schema_version": "0.2.1",
+            "schema_version": "0.3.0",
             "subject_revision": profile["subject"]["subject_revision"],
             "controls": [
                 {
@@ -345,7 +357,7 @@ class SkillContractTests(unittest.TestCase):
             ROOT / "examples" / "composite-saas", profile=profile
         )
         evidence = {
-            "schema_version": "0.2.1",
+            "schema_version": "0.3.0",
             "subject_revision": profile["subject"]["subject_revision"],
             "controls": [
                 {
@@ -372,7 +384,7 @@ class SkillContractTests(unittest.TestCase):
             ROOT / "examples" / "composite-saas", profile=profile
         )
         evidence = {
-            "schema_version": "0.2.1",
+            "schema_version": "0.3.0",
             "subject_revision": profile["subject"]["subject_revision"],
             "controls": [
                 {
@@ -410,7 +422,7 @@ class SkillContractTests(unittest.TestCase):
             ROOT / "examples" / "next-static", profile=profile
         )
         evidence = {
-            "schema_version": "0.2.1",
+            "schema_version": "0.3.0",
             "subject_revision": profile["subject"]["subject_revision"],
             "controls": [],
             "waivers": [],
@@ -441,7 +453,7 @@ class SkillContractTests(unittest.TestCase):
             for control_id in blocker_ids
         ]
         evidence = {
-            "schema_version": "0.2.1",
+            "schema_version": "0.3.0",
             "subject_revision": profile["subject"]["subject_revision"],
             "controls": [],
             "waivers": waivers,
@@ -479,7 +491,7 @@ class SkillContractTests(unittest.TestCase):
         )
         initial = LEDGER.build_ledger(profile, checks)
         evidence = {
-            "schema_version": "0.2.1",
+            "schema_version": "0.3.0",
             "subject_revision": profile["subject"]["subject_revision"],
             "controls": [],
             "waivers": [
@@ -701,6 +713,101 @@ openai.responses.create({ input: JSON.stringify(user) });
         self.assertEqual([], CHECKER.check_pii_logging(sources, active))
         self.assertEqual([], CHECKER.check_ai_egress(sources, active))
 
+    def test_tenant_checker_enumerates_crud_and_abstains_on_raw_sql(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            repository = Path(temporary)
+            (repository / "package.json").write_text(
+                '{"dependencies":{"next":"15"}}\n', encoding="utf-8"
+            )
+            schema = repository / "prisma" / "schema.prisma"
+            schema.parent.mkdir()
+            schema.write_text(
+                "model Organization { id String @id orders Order[] }\n"
+                "model Order { id String @id orgId String organization Organization @relation(fields:[orgId], references:[id]) }\n",
+                encoding="utf-8",
+            )
+            route = repository / "app" / "api" / "orders" / "route.ts"
+            route.parent.mkdir(parents=True)
+            route.write_text(
+                "export async function GET() {\n"
+                " const a = await prisma.order.findUnique({ where: { id: one } });\n"
+                " const b = await prisma.order.findFirst({ where: { id: two } });\n"
+                " const c = await prisma.order.findMany({ where: { id: three } });\n"
+                " const d = await prisma.order.update({ where: { id: four }, data: { status } });\n"
+                " const e = await prisma.order.delete({ where: { id: five } });\n"
+                " const f = await prisma.order.upsert({ where: { id: six }, update: { status }, create: { id: six, orgId } });\n"
+                " const g = await prisma.$queryRawUnsafe(query);\n"
+                " return Response.json([a,b,c,d,e,f,g]);\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            profile = PROFILER.profile_repository(repository)
+            checks = CHECKER.check_repository(repository, profile=profile)
+        tenant_findings = [
+            item
+            for item in checks["findings"]
+            if item["checker"]["id"] == "TENANT-QUERY-001"
+        ]
+        raw_findings = [
+            item
+            for item in checks["findings"]
+            if item["checker"]["id"] == "TENANT-RAW-QUERY-001"
+        ]
+        self.assertEqual(6, len(tenant_findings))
+        self.assertEqual(1, len(raw_findings))
+        self.assertEqual("unknown", raw_findings[0]["status"])
+        self.assertEqual([], CHECK_VALIDATOR.validate(checks))
+
+    def test_client_public_secret_checker_uses_names_only(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            repository = Path(temporary)
+            (repository / "package.json").write_text(
+                '{"dependencies":{"next":"15"}}\n', encoding="utf-8"
+            )
+            (repository / ".env.local").write_text(
+                "NEXT_PUBLIC_STRIPE_SECRET_KEY=VALUE_MUST_NOT_APPEAR\n",
+                encoding="utf-8",
+            )
+            source = repository / "src"
+            source.mkdir()
+            (source / "client.ts").write_text(
+                "const one = process.env.NEXT_PUBLIC_WEBHOOK_SECRET;\n"
+                "const two = import.meta.env.VITE_SERVICE_ROLE_SECRET;\n"
+                "const three = process.env.REACT_APP_ACCESS_TOKEN;\n"
+                "const safe = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;\n"
+                '// process.env.NEXT_PUBLIC_COMMENT_SECRET\n'
+                'const prose = "process.env.NEXT_PUBLIC_STRING_SECRET";\n',
+                encoding="utf-8",
+            )
+            profile = PROFILER.profile_repository(repository)
+            checks = CHECKER.check_repository(repository, profile=profile)
+        findings = [
+            item
+            for item in checks["findings"]
+            if item["checker"]["id"] == "CLIENT-PUBLIC-SECRET-001"
+        ]
+        self.assertEqual(4, len(findings))
+        self.assertNotIn("VALUE_MUST_NOT_APPEAR", json.dumps(checks, sort_keys=True))
+        self.assertEqual([], CHECK_VALIDATOR.validate(checks))
+
+    def test_checker_reports_unsupported_language_separately(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            repository = Path(temporary)
+            (repository / "go.mod").write_text(
+                "module example.invalid/contextsec\n\ngo 1.24\n", encoding="utf-8"
+            )
+            (repository / "main.go").write_text(
+                "package main\nfunc main() {}\n", encoding="utf-8"
+            )
+            profile = PROFILER.profile_repository(repository)
+            checks = CHECKER.check_repository(repository, profile=profile)
+            ledger = LEDGER.build_ledger(profile, checks)
+        self.assertEqual("unsupported", profile["coverage"]["language_support"])
+        self.assertEqual(
+            "unsupported", checks["subject"]["checker_coverage"]["language_support"]
+        )
+        self.assertEqual("BLOCK", ledger["gate"]["status"])
+
     def test_event_id_logging_is_not_idempotency_evidence(self):
         source = b"""
 const event = stripe.webhooks.constructEvent(body, signature, secret);
@@ -851,6 +958,7 @@ console.log(event.id);
         paths = [path.as_posix() for path in PACKAGER.release_files(ROOT)]
         self.assertIn("README.md", paths)
         self.assertIn(".agents/skills/contextsec/SKILL.md", paths)
+        self.assertIn(".github/CODEOWNERS", paths)
         forbidden = ("/.git/", "__pycache__", ".pytest_cache", ".ruff_cache")
         self.assertFalse(any(any(item in "/" + path for item in forbidden) for path in paths))
 

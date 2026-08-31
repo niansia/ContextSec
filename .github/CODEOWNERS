@@ -1,0 +1,8 @@
+* @niansia
+
+# Security-sensitive decision and release surfaces.
+/.agents/skills/contextsec/references/ @niansia
+/.agents/skills/contextsec/scripts/ @niansia
+/.github/workflows/ @niansia
+/benchmarks/ @niansia
+/SECURITY.md @niansia

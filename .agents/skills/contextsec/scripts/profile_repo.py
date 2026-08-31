@@ -20,7 +20,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
-SCHEMA_VERSION = "0.2.1"
+SCHEMA_VERSION = "0.3.0"
 DETECTOR_VERSION = "0.3.0"
 DEFAULT_MAX_FILES = 10_000
 DEFAULT_MAX_FILE_BYTES = 512 * 1024
@@ -169,6 +169,7 @@ SOURCE_SUFFIXES = {
     ".cc",
     ".cpp",
     ".cs",
+    ".cjs",
     ".dart",
     ".env.example",
     ".go",
@@ -180,6 +181,7 @@ SOURCE_SUFFIXES = {
     ".jsx",
     ".kt",
     ".kts",
+    ".mjs",
     ".php",
     ".prisma",
     ".proto",
@@ -198,6 +200,61 @@ SOURCE_SUFFIXES = {
     ".yaml",
     ".yml",
 }
+
+PROFILE_SUPPORTED_MANIFESTS = {
+    "package.json",
+    "pyproject.toml",
+    "requirements.txt",
+    "requirements.in",
+    "Pipfile",
+}
+PROFILE_UNSUPPORTED_MANIFESTS = {
+    "Gemfile",
+    "go.mod",
+    "Cargo.toml",
+    "pom.xml",
+    "build.gradle",
+    "build.gradle.kts",
+    "composer.json",
+}
+PROFILE_SUPPORTED_SUFFIXES = {
+    ".cjs",
+    ".js",
+    ".jsx",
+    ".mjs",
+    ".prisma",
+    ".py",
+    ".sql",
+    ".tf",
+    ".ts",
+    ".tsx",
+    ".vue",
+}
+PROFILE_UNSUPPORTED_SUFFIXES = {
+    ".c",
+    ".cc",
+    ".cpp",
+    ".cs",
+    ".dart",
+    ".go",
+    ".java",
+    ".kt",
+    ".kts",
+    ".php",
+    ".rb",
+    ".rs",
+    ".scala",
+    ".swift",
+}
+
+TENANT_KEY_PATTERN = (
+    r"tenantId|tenant_id|organizationId|organization_id|workspaceId|workspace_id|"
+    r"orgId|org_id"
+)
+TENANT_PREDICATE_PATTERN = (
+    TENANT_KEY_PATTERN
+    + r"|accountId|account_id|teamId|team_id|companyId|company_id"
+)
 
 MANIFEST_NAMES = {
     "package.json",
@@ -221,6 +278,54 @@ NODE_DEPENDENCY_DETECTORS: Mapping[str, Tuple[str, str, str, str]] = {
     "astro": ("node-web-framework", "baseline-web", "capabilities.web", "high"),
     "@nestjs/core": ("node-web-framework", "baseline-web", "capabilities.web", "high"),
     "@auth/core": (
+        "node-auth-library",
+        "auth-session",
+        "identity.authentication",
+        "medium",
+    ),
+    "@clerk/backend": (
+        "node-auth-library",
+        "auth-session",
+        "identity.authentication",
+        "medium",
+    ),
+    "@clerk/nextjs": (
+        "node-auth-library",
+        "auth-session",
+        "identity.authentication",
+        "medium",
+    ),
+    "@auth0/nextjs-auth0": (
+        "node-auth-library",
+        "auth-session",
+        "identity.authentication",
+        "medium",
+    ),
+    "@auth0/node-auth0": (
+        "node-auth-library",
+        "auth-session",
+        "identity.authentication",
+        "medium",
+    ),
+    "@auth0/auth0-react": (
+        "node-auth-library",
+        "auth-session",
+        "identity.authentication",
+        "medium",
+    ),
+    "@workos-inc/node": (
+        "node-auth-library",
+        "auth-session",
+        "identity.authentication",
+        "medium",
+    ),
+    "better-auth": (
+        "node-auth-library",
+        "auth-session",
+        "identity.authentication",
+        "medium",
+    ),
+    "lucia": (
         "node-auth-library",
         "auth-session",
         "identity.authentication",
@@ -259,6 +364,30 @@ NODE_DEPENDENCY_DETECTORS: Mapping[str, Tuple[str, str, str, str]] = {
         "capabilities.payments",
         "medium",
     ),
+    "ecpay_aio_nodejs": (
+        "node-payment-sdk",
+        "payments",
+        "capabilities.payments",
+        "medium",
+    ),
+    "newebpay": (
+        "node-payment-sdk",
+        "payments",
+        "capabilities.payments",
+        "medium",
+    ),
+    "node-newebpay": (
+        "node-payment-sdk",
+        "payments",
+        "capabilities.payments",
+        "medium",
+    ),
+    "@carllee1983/newebpay": (
+        "node-payment-sdk",
+        "payments",
+        "capabilities.payments",
+        "medium",
+    ),
     "graphql": (
         "node-api-library",
         "api-inbound",
@@ -278,6 +407,78 @@ NODE_DEPENDENCY_DETECTORS: Mapping[str, Tuple[str, str, str, str]] = {
         "medium",
     ),
     "got": ("node-http-client", "external-api", "integrations.external_api", "medium"),
+    "@supabase/supabase-js": (
+        "node-third-party-sdk",
+        "external-api",
+        "integrations.external_api",
+        "medium",
+    ),
+    "@sentry/node": (
+        "node-observability-sdk",
+        "external-api",
+        "integrations.external_api",
+        "medium",
+    ),
+    "@sentry/nextjs": (
+        "node-observability-sdk",
+        "external-api",
+        "integrations.external_api",
+        "medium",
+    ),
+    "posthog-js": (
+        "node-observability-sdk",
+        "external-api",
+        "integrations.external_api",
+        "medium",
+    ),
+    "posthog-node": (
+        "node-observability-sdk",
+        "external-api",
+        "integrations.external_api",
+        "medium",
+    ),
+    "drizzle-orm": (
+        "node-orm-library",
+        "foundation",
+        "technology.orm",
+        "medium",
+    ),
+    "typeorm": (
+        "node-orm-library",
+        "foundation",
+        "technology.orm",
+        "medium",
+    ),
+    "mongoose": (
+        "node-orm-library",
+        "foundation",
+        "technology.orm",
+        "medium",
+    ),
+    "kysely": (
+        "node-orm-library",
+        "foundation",
+        "technology.orm",
+        "medium",
+    ),
+    "bullmq": (
+        "node-async-library",
+        "foundation",
+        "technology.async-processing",
+        "medium",
+    ),
+    "inngest": (
+        "node-async-library",
+        "foundation",
+        "technology.async-processing",
+        "medium",
+    ),
+    "@trigger.dev/sdk": (
+        "node-async-library",
+        "foundation",
+        "technology.async-processing",
+        "medium",
+    ),
     "multer": (
         "node-upload-library",
         "file-upload",
@@ -422,7 +623,7 @@ TEXT_DETECTORS = (
         "identity",
         "medium",
         (
-            r"\b(signIn|signOut|getServerSession|auth\(|authenticate|login|verifyToken|jwt\.verify|oauth|oidc)\b",
+            r"(?:\b(?:signIn|signOut|getServerSession|authenticate|login|verifyToken|jwt\.verify|oauth|oidc|supabase\.auth)\b|\bauth\s*\()",
         ),
     ),
     TextDetector(
@@ -443,8 +644,8 @@ TEXT_DETECTORS = (
         "import",
         "medium",
         (
-            r"(?:\bfrom\s*|\brequire\s*\(\s*)[\"'](?:stripe|@adyen/api-library|braintree|paypal-rest-sdk)[\"']",
-            r"\b(import\s+stripe|from\s+stripe\s+import)\b",
+            r"^\s*(?:import\s+(?:[^;\n]*?\s+from\s+)?|(?:const|let|var)\s+[\w${}, *]+\s*=\s*require\s*\(\s*)[\"'](?:stripe|@adyen/api-library|braintree|paypal-rest-sdk|ecpay_aio_nodejs|newebpay|node-newebpay|@carllee1983/newebpay)[\"']",
+            r"^\s*(?:import\s+stripe\b|from\s+stripe\s+import\b)",
         ),
     ),
     TextDetector(
@@ -454,7 +655,7 @@ TEXT_DETECTORS = (
         "value-transfer",
         "high",
         (
-            r"\b(api\.stripe\.com|api-m\.paypal\.com|checkoutshopper[^/]*\.adyen\.com|payments\.braintree-api\.com)\b",
+            r"\b(api\.stripe\.com|api-m\.paypal\.com|checkoutshopper[^/]*\.adyen\.com|payments\.braintree-api\.com|payment(?:-stage)?\.ecpay\.com\.tw|(?:c)?core\.newebpay\.com|(?:sandbox|prod)\.tappaysdk\.com)\b",
         ),
     ),
     TextDetector(
@@ -517,7 +718,7 @@ TEXT_DETECTORS = (
         "schema-field",
         "medium",
         (
-            r"\b(tenantId|tenant_id|organizationId|organization_id|workspaceId|workspace_id)\b",
+            rf"\b(?:{TENANT_KEY_PATTERN})\b",
         ),
         required_suffixes=(".prisma", ".sql", ".graphql", ".gql"),
     ),
@@ -528,8 +729,8 @@ TEXT_DETECTORS = (
         "tenant-boundary",
         "high",
         (
-            r"\bmodel\s+(Organization|Tenant|Workspace)\b",
-            r"\b(tenantId|organizationId|workspaceId)\b",
+            r"\bmodel\s+(Organization|Tenant|Workspace|Org)\b",
+            rf"\b(?:{TENANT_KEY_PATTERN})\b",
         ),
         minimum_distinct=2,
         required_suffixes=(".prisma",),
@@ -542,7 +743,7 @@ TEXT_DETECTORS = (
         "high",
         (
             r"(?m)^\s*class\s+\w+\s*\([^\n)]*(?:SQLModel|BaseModel|models\.Model)[^\n)]*\)\s*:",
-            r"(?m)^\s*(?:tenant_id|organization_id|workspace_id)\s*(?::|=)",
+            r"(?m)^\s*(?:tenant_id|organization_id|workspace_id|org_id)\s*(?::|=)",
         ),
         minimum_distinct=2,
         required_suffixes=(".py",),
@@ -554,8 +755,21 @@ TEXT_DETECTORS = (
         "tenant-boundary",
         "medium",
         (
-            r"\b(tenantId|tenant_id|organizationId|organization_id|workspaceId|workspace_id)\b",
+            rf"\b(?:{TENANT_KEY_PATTERN})\b",
         ),
+        excluded_suffixes=(".prisma", ".sql", ".graphql", ".gql"),
+    ),
+    TextDetector(
+        "tenant-contextual-alias",
+        "multi-tenant",
+        "architecture.multi_tenant",
+        "tenant-boundary",
+        "medium",
+        (
+            r"\b(accountId|account_id|teamId|team_id|companyId|company_id)\b",
+            r"\b(tenant|multiTenant|organization|workspace|membership|tenantRole)\b",
+        ),
+        minimum_distinct=2,
         excluded_suffixes=(".prisma", ".sql", ".graphql", ".gql"),
     ),
     TextDetector(
@@ -690,7 +904,7 @@ TEXT_DETECTORS = (
         "web.cookie_auth",
         "feature",
         "high",
-        (r"\b(cookies?\s*\(|setCookie|sessionToken|getServerSession)\b",),
+        (r"(?:\b(?:setCookie|sessionToken|getServerSession)\b|\bcookies?\s*\()",),
     ),
     TextDetector(
         "feature-web-state-change",
@@ -707,7 +921,7 @@ TEXT_DETECTORS = (
         "web.sensitive_response",
         "feature",
         "medium",
-        (r"\b(NextResponse\.json|res\.json)\s*\(", r"\b(email|tenantId|billingAddress|token)\b"),
+        (r"\b(NextResponse\.json|res\.json)\s*\(", r"\b(email|tenantId|orgId|billingAddress|token)\b"),
         minimum_distinct=2,
     ),
     TextDetector(
@@ -724,7 +938,30 @@ TEXT_DETECTORS = (
         "authority.secrets_used",
         "feature",
         "high",
-        (r"\b(process\.env|os\.environ|getenv)\b.{0,80}(secret|token|password|api[_-]?key|private[_-]?key)",),
+        (
+            r"(?:\b(?:process\.env|import\.meta\.env|os\.environ|getenv)\b.{0,120}(?:secret|token|password|api[_-]?key|private[_-]?key)|^\s*(?:export\s+)?[A-Z][A-Z0-9_]*(?:SECRET|TOKEN|PASSWORD|API_KEY|PRIVATE_KEY)[A-Z0-9_]*\s*=)",
+        ),
+    ),
+    TextDetector(
+        "client-public-secret-reference",
+        "foundation",
+        "authority.secrets_used",
+        "feature",
+        "high",
+        (
+            r"\b(?:process\.env\.(?:NEXT_PUBLIC_|REACT_APP_)|import\.meta\.env\.VITE_)[A-Z0-9_]*(?:SECRET|PASSWORD|PRIVATE_KEY|ACCESS_TOKEN|REFRESH_TOKEN|SERVICE_ROLE|SIGNING_KEY|WEBHOOK_SECRET)[A-Z0-9_]*\b",
+        ),
+    ),
+    TextDetector(
+        "client-public-secret-env-key",
+        "foundation",
+        "authority.secrets_used",
+        "feature",
+        "high",
+        (
+            r"^\s*(?:export\s+)?(?:NEXT_PUBLIC_|VITE_|REACT_APP_)[A-Z0-9_]*(?:SECRET|PASSWORD|PRIVATE_KEY|ACCESS_TOKEN|REFRESH_TOKEN|SERVICE_ROLE|SIGNING_KEY|WEBHOOK_SECRET)[A-Z0-9_]*\s*=",
+        ),
+        path_pattern=r"(^|/)\.env(?:\.[^/]+)?$",
     ),
     TextDetector(
         "feature-failure-prone-processing",
@@ -1014,6 +1251,13 @@ def strict_json_loads(text: str) -> Any:
 
 
 def classify_scope(relative: Path) -> str:
+    lowered_parts = tuple(part.lower() for part in relative.parts)
+    if (
+        lowered_parts
+        and lowered_parts[0] == ".github"
+        and (len(lowered_parts) < 2 or lowered_parts[1] != "workflows")
+    ):
+        return "repository_metadata"
     lowered = {part.lower() for part in relative.parts[:-1]}
     if lowered & DOCUMENTATION_DIRS:
         return "documentation"
@@ -1032,9 +1276,53 @@ def is_supported_file(path: Path) -> bool:
     if path.name in MANIFEST_NAMES:
         return True
     name_lower = path.name.lower()
-    if name_lower.endswith(".env.example"):
+    if is_environment_file(path):
         return True
     return path.suffix.lower() in SOURCE_SUFFIXES
+
+
+def is_environment_file(path: Path) -> bool:
+    """Return whether a file is a dotenv variant without resolving its path."""
+
+    name = path.name.lower()
+    return name == ".env" or name.startswith(".env.")
+
+
+def sanitize_environment_text(text: str) -> str:
+    """Retain dotenv key names and line numbers while discarding every value."""
+
+    sanitized: List[str] = []
+    key_pattern = re.compile(
+        r"^(?P<prefix>\s*(?:export\s+)?)(?P<key>[A-Za-z_][A-Za-z0-9_]*)\s*="
+    )
+    for line in text.splitlines(keepends=True):
+        newline = "\r\n" if line.endswith("\r\n") else "\n" if line.endswith("\n") else ""
+        match = key_pattern.match(line)
+        if match is None:
+            sanitized.append(newline)
+            continue
+        sanitized.append(match.group("prefix") + match.group("key") + "=" + newline)
+    return "".join(sanitized)
+
+
+def profile_stack_family(relative: Path) -> str:
+    """Classify machine-readable profiler support independently from traversal."""
+
+    if relative.name in PROFILE_SUPPORTED_MANIFESTS:
+        return "supported"
+    if relative.name in PROFILE_UNSUPPORTED_MANIFESTS:
+        return "unsupported"
+    if is_environment_file(relative):
+        return "neutral"
+    suffix = relative.suffix.lower()
+    normalized = relative.as_posix().lower()
+    if suffix in {".yaml", ".yml"} and normalized.startswith(".github/workflows/"):
+        return "supported"
+    if suffix in PROFILE_SUPPORTED_SUFFIXES:
+        return "supported"
+    if suffix in PROFILE_UNSUPPORTED_SUFFIXES:
+        return "unsupported"
+    return "neutral"
 
 
 def has_reparse_attribute(stat_result: Any) -> bool:
@@ -1992,6 +2280,8 @@ def profile_repository(
     files_scanned = 0
     files_skipped = 0
     bytes_scanned = 0
+    supported_stack_seen = False
+    unsupported_stack_seen = False
     skip_counts: Dict[str, int] = {
         "non_production_scope": 0,
         "file_size_limit": 0,
@@ -2027,6 +2317,9 @@ def profile_repository(
             break
         files_considered += 1
         relative = relative_path.as_posix()
+        stack_family = profile_stack_family(relative_path)
+        supported_stack_seen = supported_stack_seen or stack_family == "supported"
+        unsupported_stack_seen = unsupported_stack_seen or stack_family == "unsupported"
         try:
             size = path.stat().st_size
         except OSError:
@@ -2080,15 +2373,17 @@ def profile_repository(
                 relative + "\x1fbinary=" + hashlib.sha256(raw).hexdigest()
             )
             continue
-        content_hash = hashlib.sha256(raw).hexdigest()
+        evidence_text = sanitize_environment_text(text) if is_environment_file(path) else text
+        evidence_raw = evidence_text.encode("utf-8") if is_environment_file(path) else raw
+        content_hash = hashlib.sha256(evidence_raw).hexdigest()
         file_hashes.append(relative + "\x1f" + content_hash)
         files_scanned += 1
         bytes_scanned += len(raw)
-        observations.extend(inspect_package_json(relative, text, scope))
-        observations.extend(inspect_python_manifest(relative, text, scope))
+        observations.extend(inspect_package_json(relative, evidence_text, scope))
+        observations.extend(inspect_python_manifest(relative, evidence_text, scope))
         if Path(relative).name == "package.json":
             try:
-                manifest = strict_json_loads(text)
+                manifest = strict_json_loads(evidence_text)
                 if not isinstance(manifest, dict):
                     raise ValueError("package.json root must be an object")
             except (ValueError, TypeError, RecursionError):
@@ -2097,7 +2392,7 @@ def profile_repository(
                 limitations.append(
                     "At least one production package.json could not be parsed; dependency evidence may be incomplete."
                 )
-        observations.extend(inspect_text(relative, text, scope))
+        observations.extend(inspect_text(relative, evidence_text, scope))
 
     if walk_stats.entry_limit_reached:
         partial = True
@@ -2110,6 +2405,21 @@ def profile_repository(
     claims, contradictions = build_claims(observations, declarations)
     routing = build_routing(claims)
     coverage_status = "partial" if partial else "complete"
+    language_support = (
+        "partial"
+        if supported_stack_seen and unsupported_stack_seen
+        else "supported"
+        if supported_stack_seen
+        else "unsupported"
+    )
+    if language_support == "partial":
+        limitations.append(
+            "The repository mixes supported and unsupported stack evidence; routing outside the supported profiler matrix remains unknown."
+        )
+    elif language_support == "unsupported":
+        limitations.append(
+            "No supported profiler stack was established; traversal may be complete while product-risk routing remains unsupported."
+        )
     capabilities = build_capabilities(observations, coverage_status, routing)
     required_packs = [item["pack"] for item in routing if item["state"] == "required"]
     candidate_packs = [item["pack"] for item in routing if item["state"] == "candidate"]
@@ -2132,7 +2442,11 @@ def profile_repository(
         ),
         "coverage="
         + json.dumps(
-            {"partial": partial, "skip_counts": skip_counts},
+            {
+                "partial": partial,
+                "language_support": language_support,
+                "skip_counts": skip_counts,
+            },
             sort_keys=True,
             separators=(",", ":"),
         ),
@@ -2155,6 +2469,7 @@ def profile_repository(
         },
         "coverage": {
             "status": coverage_status,
+            "language_support": language_support,
             "entries_seen": walk_stats.entries_seen,
             "production_files_considered": files_considered,
             "skip_counts": skip_counts,
@@ -2185,7 +2500,8 @@ def render_markdown(profile: Mapping[str, Any]) -> str:
         "- Repository: `" + markdown_safe(str(subject["repository"])) + "`",
         "- Subject revision: `" + str(subject["subject_revision"]) + "`",
         "- Detector version: `" + DETECTOR_VERSION + "`",
-        "- Coverage: `" + str(coverage["status"]) + "`",
+        "- Traversal coverage: `" + str(coverage["status"]) + "`",
+        "- Stack support: `" + str(coverage["language_support"]) + "`",
         "- Scanned: "
         + str(subject["files_scanned"])
         + " files / "

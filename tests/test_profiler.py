@@ -95,6 +95,23 @@ class ProfilerTests(unittest.TestCase):
             )
         )
 
+    def test_github_governance_files_cannot_pollute_profile(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            repository = Path(temporary)
+            issue_template = repository / ".github" / "ISSUE_TEMPLATE" / "detector.yml"
+            issue_template.parent.mkdir(parents=True)
+            issue_template.write_text(
+                "description: Stripe payout auth and customer export detector\n",
+                encoding="utf-8",
+            )
+            (repository / ".github" / "dependabot.yml").write_text(
+                "version: 2\nupdates: []\n", encoding="utf-8"
+            )
+            profile = PROFILER.profile_repository(repository)
+        self.assertEqual(["foundation"], profile["required_packs"])
+        self.assertEqual([], profile["candidate_packs"])
+        self.assertEqual([], profile["observations"])
+
     def test_ordinary_get_calls_are_not_http_routes(self):
         with tempfile.TemporaryDirectory() as temporary:
             repository = Path(temporary)
@@ -568,6 +585,103 @@ class ProfilerTests(unittest.TestCase):
         self.assertTrue(
             any("could not be parsed" in item for item in profile["limitations"])
         )
+
+    def test_auth_no_argument_and_clerk_dependency_form_a_required_route(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            repository = Path(temporary)
+            (repository / "package.json").write_text(
+                json.dumps(
+                    {"dependencies": {"next": "15", "@clerk/nextjs": "6"}}
+                ),
+                encoding="utf-8",
+            )
+            (repository / "route.ts").write_text(
+                "const { orgId } = await auth();\n", encoding="utf-8"
+            )
+            positive = PROFILER.profile_repository(repository)
+            (repository / "route.ts").write_text(
+                'const example = "await auth()";\n', encoding="utf-8"
+            )
+            negative = PROFILER.profile_repository(repository)
+        positive_routes = {item["pack"]: item["state"] for item in positive["routing"]}
+        negative_routes = {item["pack"]: item["state"] for item in negative["routing"]}
+        self.assertEqual("required", positive_routes["auth-session"])
+        self.assertEqual("candidate", positive_routes["multi-tenant"])
+        self.assertEqual("candidate", negative_routes["auth-session"])
+
+    def test_org_alias_routes_tenancy_but_bare_account_alias_does_not(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            repository = Path(temporary)
+            source = repository / "model.ts"
+            source.write_text(
+                'const orgId = row.orgId; const dbName = "org_id";\n',
+                encoding="utf-8",
+            )
+            positive = PROFILER.profile_repository(repository)
+            source.write_text("const accountId = user.accountId;\n", encoding="utf-8")
+            negative = PROFILER.profile_repository(repository)
+        self.assertIn("multi-tenant", positive["candidate_packs"])
+        self.assertNotIn("multi-tenant", negative["candidate_packs"])
+
+    def test_public_env_values_are_never_evidence_material(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            repository = Path(temporary)
+            (repository / "package.json").write_text(
+                '{"dependencies":{"next":"15"}}\n', encoding="utf-8"
+            )
+            dotenv = repository / ".env.local"
+            dotenv.write_text(
+                "NEXT_PUBLIC_STRIPE_SECRET_KEY=FIRST_PRIVATE_VALUE\n",
+                encoding="utf-8",
+            )
+            first = PROFILER.profile_repository(repository)
+            dotenv.write_text(
+                "NEXT_PUBLIC_STRIPE_SECRET_KEY=SECOND_DIFFERENT_PRIVATE_VALUE\n",
+                encoding="utf-8",
+            )
+            second = PROFILER.profile_repository(repository)
+        serialized = json.dumps(second, sort_keys=True)
+        self.assertNotIn("SECOND_DIFFERENT_PRIVATE_VALUE", serialized)
+        self.assertEqual(
+            first["subject"]["subject_revision"],
+            second["subject"]["subject_revision"],
+        )
+        self.assertIn(
+            "client-public-secret-env-key",
+            {item["detector"]["id"] for item in second["observations"]},
+        )
+
+    def test_stack_support_is_separate_from_traversal_completeness(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            repository = Path(temporary)
+            (repository / "go.mod").write_text(
+                "module example.invalid/contextsec\n\ngo 1.24\n", encoding="utf-8"
+            )
+            (repository / "main.go").write_text(
+                "package main\nfunc main() {}\n", encoding="utf-8"
+            )
+            unsupported = PROFILER.profile_repository(repository)
+            (repository / "package.json").write_text(
+                '{"dependencies":{"next":"15"}}\n', encoding="utf-8"
+            )
+            mixed = PROFILER.profile_repository(repository)
+        self.assertEqual("complete", unsupported["coverage"]["status"])
+        self.assertEqual("unsupported", unsupported["coverage"]["language_support"])
+        self.assertEqual("partial", mixed["coverage"]["language_support"])
+
+    def test_taiwan_payment_provider_endpoints_route_payments(self):
+        for endpoint in (
+            "https://payment.ecpay.com.tw/Cashier/AioCheckOut/V5",
+            "https://ccore.newebpay.com/MPG/mpg_gateway",
+            "https://sandbox.tappaysdk.com/tpc/payment/pay-by-prime",
+        ):
+            with self.subTest(endpoint=endpoint), tempfile.TemporaryDirectory() as temporary:
+                repository = Path(temporary)
+                (repository / "billing.ts").write_text(
+                    'fetch("' + endpoint + '");\n', encoding="utf-8"
+                )
+                profile = PROFILER.profile_repository(repository)
+            self.assertIn("payments", profile["required_packs"])
 
     def test_benchmark_manifest_matches_profiles(self):
         benchmark = json.loads(
