@@ -2,6 +2,6 @@
   "name": "contextsec-next-static-control",
   "private": true,
   "dependencies": {
-    "next": "0.0.0-demo"
+    "next": "15.5.29"
   }
 }
